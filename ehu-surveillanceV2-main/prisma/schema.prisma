@@ -1,0 +1,662 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum CasStatut {
+  nouveau
+  en_cours
+  confirme
+  infirme
+  cloture
+}
+
+enum AlerteType {
+  epidemique
+  seuil
+  information
+}
+
+enum Perimetre {
+  commune
+  wilaya
+  national
+}
+
+enum Gravite {
+  attention
+  urgent
+  critique
+}
+
+enum RapportType {
+  mensuel
+  trimestriel
+  semestriel
+  annuel
+  personnalise
+}
+
+enum RapportStatut {
+  en_cours
+  genere
+  erreur
+}
+
+enum GenerePar {
+  systeme
+  utilisateur
+}
+
+enum AlerteStatut {
+  active
+  resolue
+  archivee
+}
+
+enum ContactStatut {
+  a_contacter
+  contacte
+  sous_surveillance
+  libere
+}
+
+enum InvestigationStatut {
+  en_cours
+  terminee
+  en_attente
+}
+
+enum Sexe {
+  homme
+  femme
+}
+
+// ─── RBAC — Phase B ──────────────────────────────────────────────────────────
+
+model Role {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  color       String   @default("#1B4F8A")
+  isSystem    Boolean  @default(false) @map("is_system")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  rolePermissions RolePermission[]
+  userRoles       UserRole[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid())
+  name        String  @unique
+  slug        String  @unique
+  module      String
+  description String?
+
+  rolePermissions RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String @id @default(uuid())
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+model UserRole {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  roleId     String   @map("role_id")
+  assignedBy String?  @map("assigned_by")
+  assignedAt DateTime @default(now()) @map("assigned_at")
+
+  user     User  @relation("UserRoles", fields: [userId], references: [id], onDelete: Cascade)
+  role     Role  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  assigner User? @relation("AssignedByUser", fields: [assignedBy], references: [id])
+
+  @@unique([userId, roleId])
+  @@map("user_roles")
+}
+
+// ─── User ─────────────────────────────────────────────────────────────────────
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  firstName       String    @map("first_name")
+  lastName        String    @map("last_name")
+  etablissementId String?   @map("etablissement_id")
+  wilayadId       String?   @map("wilaya_id")
+  phone           String?
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  lastLogin       DateTime? @map("last_login")
+
+  etablissement     Etablissement?  @relation(fields: [etablissementId], references: [id])
+  wilaya            Wilaya?         @relation(fields: [wilayadId], references: [id])
+  userRoles         UserRole[]      @relation("UserRoles")
+  assignedUserRoles UserRole[]      @relation("AssignedByUser")
+  casDeclares       CasDeclare[]    @relation("MedecinCas")
+  investigations    Investigation[] @relation("EpidemiologisteInvestigation")
+  alertesCreees     Alerte[]        @relation("AlerteCreatedBy")
+  notifications     Notification[]
+  auditLogs         AuditLog[]
+  protocolesCrees   Protocole[]     @relation("ProtocoleCreatedBy")
+  protocolesModifies Protocole[]    @relation("ProtocoleUpdatedBy")
+  seuilsConfigures  SeuilAlerte[]
+  rapportsCrees     Rapport[]
+
+  @@map("users")
+}
+
+// ─── Patient ──────────────────────────────────────────────────────────────────
+
+model Patient {
+  id          String    @id @default(uuid())
+  identifiant String    @unique
+  firstName   String    @map("first_name")
+  lastName    String    @map("last_name")
+  dateOfBirth DateTime  @map("date_of_birth")
+  sex         Sexe
+  address     String
+  communeId   String?   @map("commune_id")
+  phone       String?
+  photoUrl    String?   @map("photo_url")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  commune Commune?     @relation(fields: [communeId], references: [id])
+  cas     CasDeclare[]
+
+  @@map("patients")
+}
+
+// ─── CasDeclare ───────────────────────────────────────────────────────────────
+
+model CasDeclare {
+  id                 String           @id @default(uuid())
+  codeCas            String           @unique @map("code_cas")
+  patientId          String           @map("patient_id")
+  maladieId          String           @map("maladie_id")
+  dateDebutSymptomes DateTime @map("date_debut_symptomes")
+  dateDiagnostic     DateTime @map("date_diagnostic")
+  modeConfirmation   String?  @map("mode_confirmation")
+  resultatLabo       String?  @map("resultat_labo")
+  statut             CasStatut        @default(nouveau)
+  etablissementId    String?          @map("etablissement_id")
+  service            String?
+  medecinId          String?          @map("medecin_id")
+  notesCliniques     String?          @map("notes_cliniques")
+  communeId          String?          @map("commune_id")
+  latitude           Decimal?
+  longitude          Decimal?
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  // Phase C — MDO Form exact fields
+  nin                    String?  @map("nin")
+  ageAns                 Int?     @map("age_ans")
+  ageMois                Int?     @map("age_mois")
+  ageJours               Int?     @map("age_jours")
+  profession             String?  @map("profession")
+  emailPatient           String?  @map("email_patient")
+  lieuTravail            String?  @map("lieu_travail")
+  estEtranger            Boolean? @map("est_etranger")
+  nationalite            String?  @map("nationalite")
+  symptomesTexte         String?  @map("symptomes_texte")
+  observation            String?  @map("observation")
+  atcd                   String?  @map("atcd")
+  lieuxFrequentes        String?  @map("lieux_frequentes")
+  casSimilaire           Boolean? @map("cas_similaire")
+  estHospitalise         Boolean? @map("est_hospitalise")
+  dateHospitalisation    DateTime? @map("date_hospitalisation")
+  estEvacue              Boolean? @map("est_evacue")
+  dateEvacuation         DateTime? @map("date_evacuation")
+  structureEvacuation    String?  @map("structure_evacuation")
+  typePrelevement        String?  @map("type_prelevement")
+  datePrelevement        DateTime? @map("date_prelevement")
+  destinatairePrelevements String? @map("destinataire_prelevements")
+  evolution              String?  @map("evolution")
+  dateSortie             DateTime? @map("date_sortie")
+  dateDeces              DateTime? @map("date_deces")
+  serviceDeclarant       String?  @map("service_declarant")
+  moisDeclaration        Int?     @map("mois_declaration")
+  anneeDeclaration       Int?     @map("annee_declaration")
+
+  // Phase D — Specific forms
+  donneesSpecifiques  Json?   @map("donnees_specifiques")
+  ficheSpecifiqueType String? @map("fiche_specifique_type")
+
+  // Phase E — Enhanced features
+  nationaliteCode        String?  @map("nationalite_code")      // ISO 3166-1 alpha-2
+  casSimilaireId         String?  @map("cas_similaire_id")      // Self-FK to linked similar case
+  evaluationClinique     Json?    @map("evaluation_clinique")   // Clinical evaluation data
+  structureHospitalisationId String? @map("structure_hospitalisation_id")
+  serviceHospitalisation String?  @map("service_hospitalisation")
+
+  patient       Patient        @relation(fields: [patientId], references: [id])
+  maladie       Maladie        @relation(fields: [maladieId], references: [id])
+  etablissement Etablissement? @relation(fields: [etablissementId], references: [id])
+  medecin       User?          @relation("MedecinCas", fields: [medecinId], references: [id])
+  commune       Commune?       @relation(fields: [communeId], references: [id])
+  casSimilaireRef CasDeclare?  @relation("CasSimilaireLink", fields: [casSimilaireId], references: [id])
+  casSimilairesLies CasDeclare[] @relation("CasSimilaireLink")
+  structureHospitalisation Etablissement? @relation("HospitalisationEtablissement", fields: [structureHospitalisationId], references: [id])
+  investigation Investigation?
+  fichiers      Fichier[]
+  declenchements ProtocoleDeclenchement[]
+  symptomes     CasSymptome[]
+  lieux         CasLieu[]
+  resultatsLabo ResultatLabo[]
+
+  @@map("cas_declares")
+}
+
+// ─── Symptome (reference) ─────────────────────────────────────────────────
+
+model Symptome {
+  id       String @id @default(uuid())
+  nom      String @unique
+  code     String @unique           // Short code e.g. "FIEVRE", "DIARRHEE"
+  categorie String?                 // e.g. "general", "respiratoire", "digestif", "neurologique"
+  isActive Boolean @default(true) @map("is_active")
+
+  casSymptomes CasSymptome[]
+
+  @@map("symptomes")
+}
+
+// ─── CasSymptome (junction) ───────────────────────────────────────────────
+
+model CasSymptome {
+  id         String   @id @default(uuid())
+  casId      String   @map("cas_id")
+  symptomeId String   @map("symptome_id")
+  intensite  String?  // "legere" | "moderee" | "severe"
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  cas      CasDeclare @relation(fields: [casId], references: [id], onDelete: Cascade)
+  symptome Symptome   @relation(fields: [symptomeId], references: [id])
+
+  @@unique([casId, symptomeId])
+  @@map("cas_symptomes")
+}
+
+// ─── CasLieu (up to 4 locations per case) ─────────────────────────────────
+
+model CasLieu {
+  id          String   @id @default(uuid())
+  casId       String   @map("cas_id")
+  ordre       Int      // 1-4
+  nom         String   // Place name
+  type        String?  // "domicile" | "travail" | "ecole" | "marche" | "mosquee" | "autre"
+  adresse     String?
+  communeId   String?  @map("commune_id")
+  dateDebut   DateTime? @map("date_debut")
+  dateFin     DateTime? @map("date_fin")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  cas     CasDeclare @relation(fields: [casId], references: [id], onDelete: Cascade)
+  commune Commune?   @relation(fields: [communeId], references: [id])
+
+  @@unique([casId, ordre])
+  @@map("cas_lieux")
+}
+
+// ─── Germe (reference) ────────────────────────────────────────────────────
+
+model Germe {
+  id       String  @id @default(uuid())
+  nom      String  @unique
+  code     String  @unique           // e.g. "SALMONELLA_TYPHI"
+  type     String?                   // "bacterie" | "virus" | "parasite" | "champignon"
+  isActive Boolean @default(true) @map("is_active")
+
+  resultatsLabo ResultatLabo[]
+
+  @@map("germes")
+}
+
+// ─── ResultatLabo ─────────────────────────────────────────────────────────
+
+model ResultatLabo {
+  id               String    @id @default(uuid())
+  casId            String    @map("cas_id")
+  typePrelevement  String    @map("type_prelevement")
+  datePrelevement  DateTime  @map("date_prelevement")
+  datResultat      DateTime? @map("date_resultat")
+  germeId          String?   @map("germe_id")
+  resultat         String?   // "positif" | "negatif" | "en_attente"
+  antibiogramme    String?   // Free text for antibiogram results
+  laboratoire      String?   // Lab name
+  notes            String?
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  cas   CasDeclare @relation(fields: [casId], references: [id], onDelete: Cascade)
+  germe Germe?     @relation(fields: [germeId], references: [id])
+
+  @@map("resultats_labo")
+}
+
+model FicheSpecifiqueTemplate {
+  id         String   @id @default(uuid())
+  slug       String   @unique
+  nom        String
+  schemaJson Json?    @map("schema_json")
+  version    Int      @default(1)
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("fiches_specifiques_templates")
+}
+
+// ─── Investigation ────────────────────────────────────────────────────────────
+
+model Investigation {
+  id                String              @id @default(uuid())
+  casId             String              @unique @map("cas_id")
+  epidemiologisteId String?             @map("epidemiologiste_id")
+  dateDebut         DateTime            @map("date_debut")
+  dateFin           DateTime?           @map("date_fin")
+  statut            InvestigationStatut @default(en_cours)
+  conclusion        String?
+  mesuresControle   Json?               @map("mesures_controle")
+  zoneGeographique  Json?               @map("zone_geographique")
+  createdAt         DateTime            @default(now()) @map("created_at")
+
+  cas             CasDeclare @relation(fields: [casId], references: [id])
+  epidemiologiste User?      @relation("EpidemiologisteInvestigation", fields: [epidemiologisteId], references: [id])
+  contacts        Contact[]
+
+  @@map("investigations")
+}
+
+// ─── Contact ──────────────────────────────────────────────────────────────────
+
+model Contact {
+  id              String        @id @default(uuid())
+  investigationId String        @map("investigation_id")
+  nom             String
+  telephone       String
+  relation        String?
+  statutSuivi     ContactStatut @default(a_contacter) @map("statut_suivi")
+  notes           String?
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  investigation Investigation @relation(fields: [investigationId], references: [id])
+
+  @@map("contacts")
+}
+
+// ─── Alerte ───────────────────────────────────────────────────────────────────
+
+model Alerte {
+  id              String       @id @default(uuid())
+  type            AlerteType
+  titre           String
+  description     String
+  maladieId       String?      @map("maladie_id")
+  communeId       String?      @map("commune_id")
+  nombreCas       Int          @map("nombre_cas")
+  recommandations Json?
+  statut          AlerteStatut @default(active)
+  createdBy       String?      @map("created_by")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  resolvedAt      DateTime?    @map("resolved_at")
+
+  maladie Maladie? @relation(fields: [maladieId], references: [id])
+  commune Commune? @relation(fields: [communeId], references: [id])
+  auteur  User?    @relation("AlerteCreatedBy", fields: [createdBy], references: [id])
+
+  @@map("alertes")
+}
+
+// ─── Maladie — Phase A CIM-10 ────────────────────────────────────────────────
+
+model Maladie {
+  id                   String   @id @default(uuid())
+  nom                  String
+  codeCim10            String   @unique @map("code_cim10")
+  categorie            String   // "categorie_1_mdo" | "categorie_2_epidemique" | "categorie_3_bmr"
+  nomCourt             String?  @map("nom_court")
+  seuilDefaut          Int?     @map("seuil_defaut")
+  periodeDefautJours   Int?     @default(30) @map("periode_defaut_jours")
+  categorieGravite     String?  @map("categorie_gravite") // "faible"|"moderee"|"grave"|"tres_grave"
+  delaiNotificationHeures Int?   @map("delai_notification_heures")
+  hasFicheSpecifique   Boolean  @default(false) @map("has_fiche_specifique")
+  ficheSpecifiqueSlug  String?  @map("fiche_specifique_slug")
+  groupeEpidemiologique String? @map("groupe_epidemiologique")
+  seuilAlertTexte      String?  @map("seuil_alerte_texte")
+  delaiDeclarationTexte String? @map("delai_declaration_texte")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  casDeclares  CasDeclare[]
+  alertes      Alerte[]
+  protocole    Protocole?
+  seuilsAlerte SeuilAlerte[]
+
+  @@map("maladies")
+}
+
+// ─── Etablissement ────────────────────────────────────────────────────────────
+
+model Etablissement {
+  id        String  @id @default(uuid())
+  nom       String
+  type      String
+  communeId String? @map("commune_id")
+  wilayadId String? @map("wilaya_id")
+  adresse   String?
+
+  commune Commune? @relation(fields: [communeId], references: [id])
+  wilaya  Wilaya?  @relation(fields: [wilayadId], references: [id])
+  users   User[]
+  cas     CasDeclare[]
+  hospitalisations CasDeclare[] @relation("HospitalisationEtablissement")
+
+  @@map("etablissements")
+}
+
+// ─── Wilaya ───────────────────────────────────────────────────────────────────
+
+model Wilaya {
+  id   String @id @default(uuid())
+  nom  String
+  code String @unique
+
+  communes       Commune[]
+  etablissements Etablissement[]
+  users          User[]
+  seuils         SeuilAlerte[]
+  rapports       Rapport[]
+
+  @@map("wilayas")
+}
+
+// ─── Commune ──────────────────────────────────────────────────────────────────
+
+model Commune {
+  id        String   @id @default(uuid())
+  nom       String
+  wilayadId String   @map("wilaya_id")
+  latitude  Decimal?
+  longitude Decimal?
+
+  wilaya                  Wilaya          @relation(fields: [wilayadId], references: [id])
+  patients                Patient[]
+  cas                     CasDeclare[]
+  etablissements          Etablissement[]
+  alertes                 Alerte[]
+  seuils                  SeuilAlerte[]
+  protocoleDeclenchements ProtocoleDeclenchement[]
+  casLieux                CasLieu[]
+
+  @@map("communes")
+}
+
+// ─── Fichier ──────────────────────────────────────────────────────────────────
+
+model Fichier {
+  id         String   @id @default(uuid())
+  casId      String   @map("cas_id")
+  type       String
+  url        String
+  filename   String
+  uploadedBy String?  @map("uploaded_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  cas CasDeclare @relation(fields: [casId], references: [id])
+
+  @@map("fichiers")
+}
+
+// ─── Notification ─────────────────────────────────────────────────────────────
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  type      String
+  titre     String
+  message   String
+  isRead    Boolean  @default(false) @map("is_read")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+// ─── AuditLog ─────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?  @map("user_id")
+  action    String
+  entity    String
+  entityId  String?  @map("entity_id")
+  details   Json?
+  ip        String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}
+
+// ─── Protocole ────────────────────────────────────────────────────────────────
+
+model Protocole {
+  id                     String   @id @default(uuid())
+  maladieId              String   @unique @map("maladie_id")
+  titre                  String
+  conduiteMedicale       Json     @map("conduite_medicale")
+  actionsAdministratives Json     @map("actions_administratives")
+  investigationSteps     Json     @map("investigation_steps")
+  posologies             Json?
+  mesuresPrevention      Json?    @map("mesures_prevention")
+  dureeSurveillance      Int?     @map("duree_surveillance")
+  pdfUrl                 String?  @map("pdf_url")
+  createdBy              String?  @map("created_by")
+  updatedBy              String?  @map("updated_by")
+  version                Int      @default(1)
+  isActive               Boolean  @default(true) @map("is_active")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  maladie       Maladie  @relation(fields: [maladieId], references: [id])
+  auteur        User?    @relation("ProtocoleCreatedBy", fields: [createdBy], references: [id])
+  modificateur  User?    @relation("ProtocoleUpdatedBy", fields: [updatedBy], references: [id])
+  declenchements ProtocoleDeclenchement[]
+
+  @@map("protocoles")
+}
+
+// ─── SeuilAlerte ──────────────────────────────────────────────────────────────
+
+model SeuilAlerte {
+  id               String    @id @default(uuid())
+  maladieId        String    @map("maladie_id")
+  perimetre        Perimetre
+  communeId        String?   @map("commune_id")
+  wilayadId        String?   @map("wilaya_id")
+  seuilNombre      Int       @map("seuil_nombre")
+  periodejours     Int       @default(30) @map("periode_jours")
+  gravite          Gravite
+  autoAlerte       Boolean   @default(true) @map("auto_alerte")
+  autoNotification Boolean   @default(true) @map("auto_notification")
+  configuredBy     String?   @map("configured_by")
+  isActive         Boolean   @default(true) @map("is_active")
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  maladie       Maladie      @relation(fields: [maladieId], references: [id])
+  commune       Commune?     @relation(fields: [communeId], references: [id])
+  wilaya        Wilaya?      @relation(fields: [wilayadId], references: [id])
+  configurateur User?        @relation(fields: [configuredBy], references: [id])
+  declenchements ProtocoleDeclenchement[]
+
+  @@map("seuils_alerte")
+}
+
+// ─── ProtocoleDeclenchement ───────────────────────────────────────────────────
+
+model ProtocoleDeclenchement {
+  id               String   @id @default(uuid())
+  protocoleId      String   @map("protocole_id")
+  seuilId          String   @map("seuil_id")
+  alerteId         String?  @map("alerte_id")
+  casDeclencheurId String   @map("cas_declencheur_id")
+  nombreCasActuel  Int      @map("nombre_cas_actuel")
+  communeId        String?  @map("commune_id")
+  maladieId        String   @map("maladie_id")
+  vuParMedecin     Boolean  @default(false) @map("vu_par_medecin")
+  pdfTelecharge    Boolean  @default(false) @map("pdf_telecharge")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  protocole      Protocole   @relation(fields: [protocoleId], references: [id])
+  seuil          SeuilAlerte @relation(fields: [seuilId], references: [id])
+  casDeclencheur CasDeclare  @relation(fields: [casDeclencheurId], references: [id])
+  commune        Commune?    @relation(fields: [communeId], references: [id])
+
+  @@map("protocole_declenchements")
+}
+
+// ─── Rapport ──────────────────────────────────────────────────────────────────
+
+model Rapport {
+  id        String        @id @default(uuid())
+  type      RapportType
+  titre     String
+  dateDebut DateTime      @map("date_debut")
+  dateFin   DateTime      @map("date_fin")
+  donnees   Json
+  pdfUrl    String?       @map("pdf_url")
+  excelUrl  String?       @map("excel_url")
+  generePar GenerePar     @default(utilisateur) @map("genere_par")
+  createdBy String?       @map("created_by")
+  statut    RapportStatut @default(genere)
+  wilayadId String?       @map("wilaya_id")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  wilaya        Wilaya? @relation(fields: [wilayadId], references: [id])
+  createdByUser User?   @relation(fields: [createdBy], references: [id])
+
+  @@map("rapports")
+}
