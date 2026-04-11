@@ -3,7 +3,7 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -205,8 +205,8 @@ model CasDeclare {
   medecinId          String?          @map("medecin_id")
   notesCliniques     String?          @map("notes_cliniques")
   communeId          String?          @map("commune_id")
-  latitude           Decimal?
-  longitude          Decimal?
+  latitude           Decimal?         @db.Decimal(10, 8)
+  longitude          Decimal?         @db.Decimal(11, 8)
   createdAt          DateTime         @default(now()) @map("created_at")
   updatedAt          DateTime         @updatedAt @map("updated_at")
 
@@ -497,8 +497,8 @@ model Commune {
   id        String   @id @default(uuid())
   nom       String
   wilayadId String   @map("wilaya_id")
-  latitude  Decimal?
-  longitude Decimal?
+  latitude  Decimal? @db.Decimal(9, 6)
+  longitude Decimal? @db.Decimal(9, 6)
 
   wilaya                  Wilaya          @relation(fields: [wilayadId], references: [id])
   patients                Patient[]

@@ -15,9 +15,9 @@ export async function GET(req: Request) {
   const cas = await prisma.casDeclare.findMany({
     where: {
       OR: [
-        { codeCas: { contains: q } },
-        { patient: { firstName: { contains: q } } },
-        { patient: { lastName: { contains: q } } },
+        { codeCas: { contains: q, mode: "insensitive" } },
+        { patient: { firstName: { contains: q, mode: "insensitive" } } },
+        { patient: { lastName: { contains: q, mode: "insensitive" } } },
       ],
     },
     take: 10,

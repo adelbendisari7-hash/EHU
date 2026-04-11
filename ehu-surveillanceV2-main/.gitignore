@@ -13,6 +13,8 @@ out/
 
 # Prisma
 prisma/migrations/dev_*
+prisma/*.db
+prisma/*.db-journal
 
 # Logs
 *.log

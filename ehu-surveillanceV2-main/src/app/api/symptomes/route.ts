@@ -12,8 +12,8 @@ export async function GET(req: Request) {
   const where: Record<string, unknown> = { isActive: true }
   if (search) {
     where.OR = [
-      { nom: { contains: search } },
-      { code: { contains: search } },
+      { nom: { contains: search, mode: "insensitive" } },
+      { code: { contains: search, mode: "insensitive" } },
     ]
   }
 
