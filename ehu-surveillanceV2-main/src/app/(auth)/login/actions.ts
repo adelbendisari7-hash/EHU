@@ -21,7 +21,6 @@ export async function loginAction(formData: FormData) {
     return { success: true, error: null }
   } catch (error) {
     if (isRedirectError(error)) {
-      // signIn with redirect:false shouldn't redirect, but just in case
       return { success: true, error: null }
     }
     if (error instanceof AuthError) {

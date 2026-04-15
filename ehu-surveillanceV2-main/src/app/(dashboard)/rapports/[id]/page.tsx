@@ -7,7 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, LineChart, Line, PieChart, Pie, Legend,
 } from "recharts"
-import { exportAnalysesPdf } from "@/utils/export-pdf"
+import { exportAnalysesPdf, printAnalysesPdf } from "@/utils/export-pdf"
 import { exportAnalysesExcel } from "@/utils/export-excel"
 import {
   FileText, FileSpreadsheet, ArrowLeft, Printer,
@@ -74,7 +74,7 @@ export default function RapportDetailPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [rapport, setRapport] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [exportLoading, setExportLoading] = useState<"pdf" | "excel" | null>(null)
+  const [exportLoading, setExportLoading] = useState<"pdf" | "excel" | "print" | null>(null)
 
   useEffect(() => {
     fetch(`/api/rapports/${id}`)
@@ -89,6 +89,23 @@ export default function RapportDetailPage() {
       const period = `${new Date(rapport.dateDebut).toLocaleDateString("fr-FR")} — ${new Date(rapport.dateFin).toLocaleDateString("fr-FR")}`
       const d = rapport.donnees
       await exportAnalysesPdf({
+        summary: d.summary,
+        prevalence: d.casByMaladie?.map((r: { maladie: string; count: number }) => ({ name: r.maladie, count: r.count })) ?? [],
+        weeklyTrend: d.weeklyTrend ?? [],
+        ageDistribution: d.ageDistribution ?? [],
+        sexDistribution: d.sexDistribution ?? [],
+        statutDistribution: d.statutDistribution ?? [],
+        period,
+      })
+    } finally { setExportLoading(null) }
+  }
+
+  const handlePrint = async () => {
+    setExportLoading("print")
+    try {
+      const period = `${new Date(rapport.dateDebut).toLocaleDateString("fr-FR")} — ${new Date(rapport.dateFin).toLocaleDateString("fr-FR")}`
+      const d = rapport.donnees
+      await printAnalysesPdf({
         summary: d.summary,
         prevalence: d.casByMaladie?.map((r: { maladie: string; count: number }) => ({ name: r.maladie, count: r.count })) ?? [],
         weeklyTrend: d.weeklyTrend ?? [],
@@ -167,11 +184,12 @@ export default function RapportDetailPage() {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => window.print()}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white border border-white/30 hover:bg-white/10 transition-colors"
+              onClick={handlePrint}
+              disabled={exportLoading !== null}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white border border-white/30 hover:bg-white/10 transition-colors disabled:opacity-60"
             >
               <Printer size={14} />
-              Imprimer
+              {exportLoading === "print" ? "Préparation..." : "Imprimer"}
             </button>
           </div>
         </div>
@@ -285,7 +303,7 @@ export default function RapportDetailPage() {
                   />
                   <Tooltip
                     contentStyle={{ borderRadius: "8px", fontSize: "12px", border: "1px solid #E5E7EB" }}
-                    formatter={(val: number) => [`${val} cas`, "Nombre"]}
+                    formatter={(val) => [`${Number(val ?? 0)} cas`, "Nombre"]}
                   />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={18}>
                     {d.casByMaladie.map((_: unknown, i: number) => (
@@ -307,7 +325,7 @@ export default function RapportDetailPage() {
                   <YAxis tick={{ fontSize: 9, fill: "#9CA3AF" }} tickLine={false} axisLine={false} />
                   <Tooltip
                     contentStyle={{ borderRadius: "8px", fontSize: "12px", border: "1px solid #E5E7EB" }}
-                    formatter={(val: number) => [`${val} cas`, "Semaine"]}
+                    formatter={(val) => [`${Number(val ?? 0)} cas`, "Semaine"]}
                   />
                   <Line
                     type="monotone"
@@ -376,7 +394,7 @@ export default function RapportDetailPage() {
                 <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} tickLine={false} axisLine={false} />
                 <Tooltip
                   contentStyle={{ borderRadius: "8px", fontSize: "12px", border: "1px solid #E5E7EB" }}
-                  formatter={(val: number) => [`${val} cas`, "Tranche d'âge"]}
+                  formatter={(val) => [`${Number(val ?? 0)} cas`, "Tranche d'âge"]}
                 />
                 <Bar dataKey="count" fill="#1B4F8A" radius={[4, 4, 0, 0]} maxBarSize={32} />
               </BarChart>
@@ -408,7 +426,7 @@ export default function RapportDetailPage() {
                   </Pie>
                   <Tooltip
                     contentStyle={{ borderRadius: "8px", fontSize: "12px", border: "1px solid #E5E7EB" }}
-                    formatter={(val: number) => [`${val} cas`, ""]}
+                    formatter={(val) => [`${Number(val ?? 0)} cas`, ""]}
                   />
                 </PieChart>
               </ResponsiveContainer>

@@ -17,7 +17,7 @@ export default async function DashboardLayout({
   const permissions: string[] = session.user.permissions ?? []
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#F7F8FA" }}>
+    <div className="min-h-screen" style={{ backgroundColor: "var(--gray-50)" }}>
       <Sidebar userName={userName} userRole={userRole} permissions={permissions} />
       <Topbar userName={userName} />
       <main className="pt-14 min-h-screen lg:ml-64">

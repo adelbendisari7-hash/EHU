@@ -18,7 +18,16 @@ const loginSchema = z.object({
 })
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
+  secret: process.env.AUTH_SECRET,
   trustHost: true,
+  pages: {
+    signIn: "/login",
+    error: "/login",
+  },
+  session: {
+    strategy: "jwt",
+    maxAge: 8 * 60 * 60,
+  },
   providers: [
     Credentials({
       async authorize(credentials) {
@@ -30,8 +39,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const user = await prisma.user.findUnique({
           where: { email },
           include: {
-            etablissement: true,
-            wilaya: true,
             userRoles: {
               include: {
                 role: {
@@ -62,52 +69,41 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             )
           ),
         ]
-        // Primary role for backward compatibility
-        const primaryRole = roles[0] ?? "medecin"
 
         return {
           id: user.id,
           email: user.email,
           name: `${user.firstName} ${user.lastName}`,
-          role: primaryRole,
+          role: roles[0] ?? "medecin",
           roles,
           permissions,
           etablissementId: user.etablissementId,
           wilayadId: user.wilayadId,
-        }
+        } as EHUUser
       },
     }),
   ],
   callbacks: {
     jwt({ token, user }) {
       if (user) {
-        token.id = user.id
-        token.role = (user as EHUUser).role
-        token.roles = (user as EHUUser).roles
-        token.permissions = (user as EHUUser).permissions
-        token.etablissementId = (user as EHUUser).etablissementId
-        token.wilayadId = (user as EHUUser).wilayadId
+        const u = user as EHUUser
+        token.id = u.id
+        token.role = u.role
+        token.roles = u.roles
+        token.permissions = u.permissions
+        token.etablissementId = u.etablissementId
+        token.wilayadId = u.wilayadId
       }
       return token
     },
     session({ session, token }) {
-      if (token) {
-        session.user.id = token.id as string
-        session.user.role = token.role as string
-        session.user.roles = token.roles as string[]
-        session.user.permissions = token.permissions as string[]
-        session.user.etablissementId = token.etablissementId as string
-        session.user.wilayadId = token.wilayadId as string
-      }
+      session.user.id = token.id as string
+      session.user.role = token.role as string
+      session.user.roles = token.roles as string[]
+      session.user.permissions = token.permissions as string[]
+      session.user.etablissementId = token.etablissementId as string
+      session.user.wilayadId = token.wilayadId as string
       return session
     },
-  },
-  pages: {
-    signIn: "/login",
-    error: "/login",
-  },
-  session: {
-    strategy: "jwt",
-    maxAge: 30 * 60,
   },
 })

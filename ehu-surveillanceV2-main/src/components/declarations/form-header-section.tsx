@@ -1,5 +1,6 @@
 "use client"
 import { UseFormRegister, FieldErrors } from "react-hook-form"
+import { SERVICES_PAR_SECTEUR, serviceLabel } from "@/constants/services"
 
 const MOIS = [
   { value: 1, label: "Janvier" }, { value: 2, label: "Février" }, { value: 3, label: "Mars" },
@@ -25,11 +26,18 @@ export default function FormHeaderSection({ register, errors }: { register: UseF
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <label className="label">Service déclarant</label>
-            <input
-              {...register("serviceDeclarant")}
-              className="input w-full"
-              placeholder="Ex: Maladies infectieuses"
-            />
+            <select {...register("serviceDeclarant")} className="input w-full">
+              <option value="">-- Sélectionner un service --</option>
+              {Object.entries(SERVICES_PAR_SECTEUR).map(([secteur, services]) => (
+                <optgroup key={secteur} label={secteur}>
+                  {services.map((s) => (
+                    <option key={s.code} value={serviceLabel(s)}>
+                      {serviceLabel(s)}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
             {errors.serviceDeclarant && <p className="text-red-500 text-[11px] mt-1">{String(errors.serviceDeclarant.message)}</p>}
           </div>
           <div>

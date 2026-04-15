@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
     const baseWhere = {
       createdAt: { gte: since, lte: until },
-      ...(serviceFilter ? { service: { contains: serviceFilter as const } } : {}),
+      ...(serviceFilter ? { service: { contains: serviceFilter } } : {}),
     }
 
     const [totalCas, casByMaladieRaw, casByCommuneRaw, casByServiceRaw, weeklyRaw, ageRaw, statutRaw, totalAlertes, totalInvestigations] =
