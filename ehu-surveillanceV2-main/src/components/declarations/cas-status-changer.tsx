@@ -6,7 +6,9 @@ import type { CasStatut } from "@/types"
 import { CAS_STATUTS } from "@/constants/statuts"
 
 const WORKFLOW: Record<CasStatut, CasStatut[]> = {
+  brouillon: ["nouveau"],
   nouveau: ["en_cours"],
+  suspect: ["en_cours", "infirme"],
   en_cours: ["confirme", "infirme"],
   confirme: ["cloture"],
   infirme: ["cloture"],

@@ -7,16 +7,26 @@ export async function GET(req: Request) {
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const maladieId = searchParams.get("maladieId") ?? ""
   const communeId = searchParams.get("communeId") ?? ""
   const days = parseInt(searchParams.get("days") ?? "30")
+  // Multi-select support: comma-separated IDs
+  const maladieIds = (searchParams.get("maladieIds") ?? "").split(",").filter(Boolean)
+  const wilayadIds = (searchParams.get("wilayadIds") ?? "").split(",").filter(Boolean)
+  // Legacy single-value support
+  const maladieId = searchParams.get("maladieId") ?? ""
+  if (maladieId && !maladieIds.includes(maladieId)) maladieIds.push(maladieId)
 
   const since = new Date()
   since.setDate(since.getDate() - days)
 
   const where: Record<string, unknown> = { createdAt: { gte: since } }
-  if (maladieId) where.maladieId = maladieId
+  if (maladieIds.length === 1) where.maladieId = maladieIds[0]
+  else if (maladieIds.length > 1) where.maladieId = { in: maladieIds }
   if (communeId) where.communeId = communeId
+  // Wilaya filter via commune relation
+  if (wilayadIds.length > 0) {
+    where.commune = { wilayadId: { in: wilayadIds } }
+  }
 
   // Stat cards
   const [totalActifs, totalAlertes, totalMaladies] = await Promise.all([
@@ -46,7 +56,7 @@ export async function GET(req: Request) {
       lat: Number(c.commune!.latitude),
       lng: Number(c.commune!.longitude),
       statut: c.statut,
-      maladie: c.maladie.nom,
+      maladie: c.maladie?.nom ?? "—",
       commune: c.commune!.nom,
       date: c.createdAt,
     }))
@@ -82,12 +92,12 @@ export async function GET(req: Request) {
     take: 8,
   })
 
-  const maladieIds = casByMaladie.map(c => c.maladieId)
-  const maladies = await prisma.maladie.findMany({ where: { id: { in: maladieIds } } })
-  const maladieMap = Object.fromEntries(maladies.map(m => [m.id, m.nom]))
+  const distMaladieIds = casByMaladie.map(c => c.maladieId).filter((id): id is string => Boolean(id))
+  const maladiesRef = await prisma.maladie.findMany({ where: { id: { in: distMaladieIds } } })
+  const maladieMap = Object.fromEntries(maladiesRef.map(m => [m.id, m.nom]))
 
   const diseaseDistribution = casByMaladie.map(c => ({
-    name: maladieMap[c.maladieId] ?? "Inconnu",
+    name: c.maladieId ? (maladieMap[c.maladieId] ?? "Inconnu") : "Non renseigné",
     count: c._count.id,
   }))
 

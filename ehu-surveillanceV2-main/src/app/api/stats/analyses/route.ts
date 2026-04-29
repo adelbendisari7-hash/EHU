@@ -23,10 +23,10 @@ export async function GET(req: Request) {
     _count: { id: true },
     orderBy: { _count: { id: "desc" } },
   })
-  const maladieIds = byMaladie.map(r => r.maladieId)
+  const maladieIds = byMaladie.map(r => r.maladieId).filter((id): id is string => Boolean(id))
   const maladies = await prisma.maladie.findMany({ where: { id: { in: maladieIds } } })
   const maladieMap = Object.fromEntries(maladies.map(m => [m.id, m.nom]))
-  const prevalence = byMaladie.map(r => ({ name: maladieMap[r.maladieId] ?? "Inconnu", count: r._count.id }))
+  const prevalence = byMaladie.map(r => ({ name: r.maladieId ? (maladieMap[r.maladieId] ?? "Inconnu") : "Non renseigné", count: r._count.id }))
 
   // Cases by status
   const byStatut = await prisma.casDeclare.groupBy({

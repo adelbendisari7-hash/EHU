@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
-import { Eye, Pencil, Trash2, ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Search, Filter } from "lucide-react"
+import { Eye, Pencil, Trash2, ChevronLeft, ChevronRight, AlertCircle, RefreshCw, Search, ChevronDown } from "lucide-react"
 import CasStatusBadge from "./cas-status-badge"
 import { formatDate } from "@/utils/format-date"
 import { TableSkeleton } from "@/components/shared/skeleton"
 import { toast } from "sonner"
+import { cn } from "@/utils/cn"
+import { SERVICES_EHU } from "@/constants/services"
 import type { CasStatut } from "@/types"
 
 interface Cas {
@@ -17,7 +19,7 @@ interface Cas {
   observation: string | null
   createdAt: string
   patient: { firstName: string; lastName: string }
-  maladie: { nom: string }
+  maladie: { nom: string } | null
   commune: { nom: string } | null
   medecin: { firstName: string; lastName: string } | null
   etablissement: { nom: string } | null
@@ -30,10 +32,95 @@ interface CasResponse {
   totalPages: number
 }
 
-const STATUTS = ["", "nouveau", "en_cours", "confirme", "infirme", "cloture"]
+const STATUTS = ["", "brouillon", "nouveau", "en_cours", "confirme", "suspect", "infirme", "cloture"]
 const STATUT_LABELS: Record<string, string> = {
-  "": "Tous", nouveau: "Nouveau", en_cours: "En cours",
-  confirme: "Confirmé", infirme: "Infirmé", cloture: "Clôturé",
+  "": "Tous",
+  brouillon: "Brouillons",
+  nouveau: "Nouveau",
+  en_cours: "En cours",
+  confirme: "Confirmé",
+  suspect: "Suspect",
+  infirme: "Infirmé",
+  cloture: "Clôturé",
+}
+
+// Searchable service dropdown
+function ServiceFilter({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+
+  const filtered = SERVICES_EHU.filter(s =>
+    s.nom.toLowerCase().includes(search.toLowerCase())
+  )
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "input flex items-center justify-between gap-2 h-[34px] text-[12px] w-44",
+          value && "border-[#1B4F8A]"
+        )}
+      >
+        <span className={value ? "text-gray-900 truncate" : "text-gray-400"}>
+          {value || "Service..."}
+        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          {value && (
+            <button
+              type="button"
+              onClick={e => { e.stopPropagation(); onChange(""); setOpen(false) }}
+              className="text-gray-400 hover:text-gray-600 text-xs leading-none"
+            >
+              ✕
+            </button>
+          )}
+          <ChevronDown size={12} className="text-gray-400" />
+        </div>
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-56 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-hidden">
+          <div className="p-2 border-b border-gray-100">
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Rechercher..."
+                className="input w-full pl-8 text-[12px] h-7"
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="overflow-y-auto max-h-48">
+            <button
+              type="button"
+              onClick={() => { onChange(""); setOpen(false); setSearch("") }}
+              className="w-full text-left px-3 py-2 text-[12px] text-gray-400 hover:bg-gray-50"
+            >
+              Tous les services
+            </button>
+            {filtered.map(s => (
+              <button
+                key={s.code}
+                type="button"
+                onClick={() => { onChange(s.nom); setOpen(false); setSearch("") }}
+                className={cn(
+                  "w-full text-left px-3 py-2 text-[12px] hover:bg-gray-50 transition-colors border-b border-gray-50 last:border-0",
+                  value === s.nom && "bg-blue-50 text-[#1B4F8A] font-medium"
+                )}
+              >
+                {s.nom}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+      {open && <div className="fixed inset-0 z-40" onClick={() => { setOpen(false); setSearch("") }} />}
+    </div>
+  )
 }
 
 export default function CasListTable({ userRole }: { userRole: string }) {
@@ -92,15 +179,9 @@ export default function CasListTable({ userRole }: { userRole: string }) {
             className="input pl-9 h-[34px] text-[12px]"
           />
         </div>
-        <input
-          type="text"
-          placeholder="Service..."
-          value={service}
-          onChange={e => setService(e.target.value)}
-          className="input w-36 h-[34px] text-[12px]"
-        />
+        <ServiceFilter value={service} onChange={setService} />
         {/* Status pills */}
-        <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+        <div className="flex flex-wrap rounded-lg border border-gray-200 overflow-hidden">
           {STATUTS.map(s => (
             <button
               key={s}
@@ -152,7 +233,7 @@ export default function CasListTable({ userRole }: { userRole: string }) {
                 <tr key={cas.id} className="table-row group">
                   <td className="text-mono text-[12px] text-gray-500">{cas.codeCas}</td>
                   <td className="font-medium text-gray-800">{cas.patient.firstName} {cas.patient.lastName}</td>
-                  <td className="text-gray-600">{cas.maladie.nom}</td>
+                  <td className="text-gray-600">{cas.maladie?.nom ?? <span className="text-gray-300">—</span>}</td>
                   <td className="text-gray-500">{cas.service ?? "—"}</td>
                   <td className="text-gray-500">{cas.commune?.nom ?? "—"}</td>
                   <td className="text-gray-500 text-mono text-[12px]">{formatDate(cas.createdAt)}</td>
@@ -222,7 +303,7 @@ export default function CasListTable({ userRole }: { userRole: string }) {
                     {cas.patient.firstName} {cas.patient.lastName}
                   </p>
                   <p className="text-[11px] text-gray-400 mt-0.5">
-                    {cas.maladie.nom} · {cas.commune?.nom ?? "—"} · {formatDate(cas.createdAt)}
+                    {cas.maladie?.nom ?? "—"} · {cas.commune?.nom ?? "—"} · {formatDate(cas.createdAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0">
@@ -247,7 +328,6 @@ export default function CasListTable({ userRole }: { userRole: string }) {
             >
               <ChevronLeft size={14} />
             </button>
-            {/* Page numbers */}
             {Array.from({ length: Math.min(data.totalPages, 5) }, (_, i) => {
               const p = i + 1
               return (

@@ -10,9 +10,11 @@ datasource db {
 // ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum CasStatut {
+  brouillon
   nouveau
   en_cours
   confirme
+  suspect
   infirme
   cloture
 }
@@ -167,6 +169,21 @@ model User {
   @@map("users")
 }
 
+// ─── MedecinDeclarant ─────────────────────────────────────────────────────────
+
+model MedecinDeclarant {
+  id        String   @id @default(uuid())
+  nom       String
+  prenom    String
+  service   String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  cas CasDeclare[]
+
+  @@unique([nom, prenom, service])
+  @@map("medecins_declarants")
+}
+
 // ─── Patient ──────────────────────────────────────────────────────────────────
 
 model Patient {
@@ -194,9 +211,9 @@ model CasDeclare {
   id                 String           @id @default(uuid())
   codeCas            String           @unique @map("code_cas")
   patientId          String           @map("patient_id")
-  maladieId          String           @map("maladie_id")
-  dateDebutSymptomes DateTime @map("date_debut_symptomes")
-  dateDiagnostic     DateTime @map("date_diagnostic")
+  maladieId          String?          @map("maladie_id")
+  dateDebutSymptomes DateTime? @map("date_debut_symptomes")
+  dateDiagnostic     DateTime? @map("date_diagnostic")
   modeConfirmation   String?  @map("mode_confirmation")
   resultatLabo       String?  @map("resultat_labo")
   statut             CasStatut        @default(nouveau)
@@ -239,6 +256,7 @@ model CasDeclare {
   serviceDeclarant       String?  @map("service_declarant")
   moisDeclaration        Int?     @map("mois_declaration")
   anneeDeclaration       Int?     @map("annee_declaration")
+  medecinDeclarantId     String?  @map("medecin_declarant_id")
 
   // Phase D — Specific forms
   donneesSpecifiques  Json?   @map("donnees_specifiques")
@@ -251,10 +269,11 @@ model CasDeclare {
   structureHospitalisationId String? @map("structure_hospitalisation_id")
   serviceHospitalisation String?  @map("service_hospitalisation")
 
-  patient       Patient        @relation(fields: [patientId], references: [id])
-  maladie       Maladie        @relation(fields: [maladieId], references: [id])
-  etablissement Etablissement? @relation(fields: [etablissementId], references: [id])
-  medecin       User?          @relation("MedecinCas", fields: [medecinId], references: [id])
+  patient              Patient            @relation(fields: [patientId], references: [id])
+  maladie              Maladie?           @relation(fields: [maladieId], references: [id])
+  etablissement        Etablissement?     @relation(fields: [etablissementId], references: [id])
+  medecin              User?              @relation("MedecinCas", fields: [medecinId], references: [id])
+  medecinDeclarant     MedecinDeclarant?  @relation(fields: [medecinDeclarantId], references: [id])
   commune       Commune?       @relation(fields: [communeId], references: [id])
   casSimilaireRef CasDeclare?  @relation("CasSimilaireLink", fields: [casSimilaireId], references: [id])
   casSimilairesLies CasDeclare[] @relation("CasSimilaireLink")

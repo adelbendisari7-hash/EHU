@@ -235,7 +235,7 @@ describe("CasDeclare Model — Create and Read", () => {
     })
     expect(cas).toBeTruthy()
     expect(cas!.patient.firstName).toBe("TestPrenom")
-    expect(cas!.maladie.nom).toBeTruthy()
+    expect(cas!.maladie?.nom).toBeTruthy()
   })
 
   it("can create CasSymptome links", async () => {

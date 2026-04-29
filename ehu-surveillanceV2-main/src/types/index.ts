@@ -1,6 +1,6 @@
 export type Role = "medecin" | "epidemiologiste" | "admin"
 
-export type CasStatut = "nouveau" | "en_cours" | "confirme" | "infirme" | "cloture"
+export type CasStatut = "brouillon" | "nouveau" | "en_cours" | "confirme" | "suspect" | "infirme" | "cloture"
 
 export type AlerteType = "epidemique" | "seuil" | "information"
 

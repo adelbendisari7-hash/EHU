@@ -87,15 +87,43 @@ export async function POST(req: Request) {
     const patient = await prisma.patient.create({
       data: {
         identifiant: generatePatientId(),
-        firstName: body.patient.firstName,
-        lastName: body.patient.lastName,
-        dateOfBirth: body.patient.dateOfBirth ? new Date(body.patient.dateOfBirth) : new Date(),
-        sex: body.patient.sex,
-        address: body.patient.address,
+        firstName: body.patient.firstName || "—",
+        lastName: body.patient.lastName || "—",
+        dateOfBirth: body.patient.dateOfBirth ? new Date(body.patient.dateOfBirth) : new Date("2000-01-01"),
+        sex: body.patient.sex || "homme",
+        address: body.patient.address || "—",
         communeId: body.patient.communeId || null,
         phone: body.patient.phone || null,
       },
     })
+
+    // Resolve or create MedecinDeclarant
+    let medecinDeclarantId = body.medecinDeclarantId || null
+    if (!medecinDeclarantId && body.nomMedecinDeclarant && body.prenomMedecinDeclarant && body.serviceDeclarant) {
+      const med = await prisma.medecinDeclarant.upsert({
+        where: {
+          nom_prenom_service: {
+            nom: body.nomMedecinDeclarant,
+            prenom: body.prenomMedecinDeclarant,
+            service: body.serviceDeclarant,
+          },
+        },
+        update: {},
+        create: {
+          nom: body.nomMedecinDeclarant,
+          prenom: body.prenomMedecinDeclarant,
+          service: body.serviceDeclarant,
+        },
+      })
+      medecinDeclarantId = med.id
+    }
+
+    // Derive statut from observation or use provided statut
+    let statut: string = body.statut || "nouveau"
+    if (statut !== "brouillon") {
+      if (body.observation === "cas_confirme") statut = "confirme"
+      else if (body.observation === "cas_suspect") statut = "suspect"
+    }
 
     // Create case
     const data = body
@@ -103,12 +131,13 @@ export async function POST(req: Request) {
       data: {
         codeCas: generateCaseCode(),
         patientId: patient.id,
-        maladieId: body.maladieId,
-        dateDebutSymptomes: new Date(body.dateDebutSymptomes),
-        dateDiagnostic: new Date(body.dateDiagnostic),
+        maladieId: body.maladieId || null,
+        dateDebutSymptomes: data.dateDebutSymptomes ? new Date(data.dateDebutSymptomes) : null,
+        dateDiagnostic: data.dateDiagnostic ? new Date(data.dateDiagnostic) : null,
         modeConfirmation: body.modeConfirmation || null,
         resultatLabo: body.resultatLabo || null,
-        statut: "nouveau",
+        statut: statut as import("@prisma/client").CasStatut,
+        medecinDeclarantId,
         etablissementId: body.etablissementId || session.user.etablissementId || null,
         service: body.service,
         medecinId: session.user.id,
@@ -199,6 +228,11 @@ export async function POST(req: Request) {
           notes: r.notes || null,
         })),
       })
+    }
+
+    // Skip alert checking for brouillon
+    if (statut === "brouillon") {
+      return NextResponse.json({ ...cas, declenchement: null }, { status: 201 })
     }
 
     // Check seuils configurés and trigger protocole if threshold exceeded

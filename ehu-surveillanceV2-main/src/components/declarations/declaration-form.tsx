@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -12,7 +12,7 @@ import DiseaseCombobox from "@/components/ui/disease-combobox"
 import FormHeaderSection from "@/components/declarations/form-header-section"
 import FicheDynamiqueRenderer from "@/components/declarations/fiche-dynamique-renderer"
 import { toast } from "sonner"
-import { Scan, AlertCircle, CheckCircle2, Loader2, Plus, X, Search, ChevronDown } from "lucide-react"
+import { Scan, AlertCircle, CheckCircle2, Loader2, Plus, X, Search, ChevronDown, FileText } from "lucide-react"
 import type { OcrScanResult } from "@/hooks/use-ocr-scan"
 import { NATIONALITIES } from "@/constants/nationalities"
 import { SYMPTOM_CATEGORIES } from "@/constants/symptoms"
@@ -22,7 +22,6 @@ import { LIEU_TYPES } from "@/constants/lieu-types"
 // ---------------------------------------------------------------------------
 // Zod Schema
 // ---------------------------------------------------------------------------
-// Helper: NaN-safe optional number — converts NaN to undefined, rejects out-of-range
 function optNum(min: number, max: number) {
   return z.union([
     z.number().refine(n => !isNaN(n)).pipe(z.number().min(min).max(max)),
@@ -37,8 +36,12 @@ function optInt() {
 }
 
 const declarationSchema = z.object({
-  // Header
-  serviceDeclarant: z.string().optional(),
+  // Header — médecin déclarant
+  medecinDeclarantId: z.string().optional(),
+  nomMedecinDeclarant: z.string().min(2, "Nom du médecin requis"),
+  prenomMedecinDeclarant: z.string().min(2, "Prénom du médecin requis"),
+  serviceDeclarant: z.string().min(1, "Service déclarant requis"),
+  // kept for DB compat but not shown in UI
   moisDeclaration: optInt(),
   anneeDeclaration: optInt(),
 
@@ -65,8 +68,8 @@ const declarationSchema = z.object({
 
   // Section 2 — Données Cliniques
   maladieId: z.string().min(1, "Maladie requise"),
-  dateDebutSymptomes: z.string().min(1, "Date requise"),
-  dateDiagnostic: z.string().min(1, "Date requise"),
+  dateDebutSymptomes: z.string().optional(),
+  dateDiagnostic: z.string().optional(),
   symptomesTexte: z.string().optional(),
   observation: z.enum(["cas_confirme", "cas_suspect"]).optional(),
   modeConfirmation: z.enum(["clinique", "biologique", "epidemiologique"]).optional(),
@@ -79,7 +82,6 @@ const declarationSchema = z.object({
   dateHospitalisation: z.string().optional(),
   structureHospitalisationId: z.string().optional(),
   serviceHospitalisation: z.string().optional(),
-  evaluationClinique: z.string().optional(),
   estEvacue: z.boolean().optional(),
   dateEvacuation: z.string().optional(),
   structureEvacuation: z.string().optional(),
@@ -93,6 +95,18 @@ const declarationSchema = z.object({
   service: z.string().optional(),
   notesCliniques: z.string().optional(),
   resultatLabo: z.string().optional(),
+})
+
+// Brouillon schema — only the bare minimum
+const brouillonSchema = declarationSchema.partial().extend({
+  maladieId: z.string().optional(),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  sex: z.enum(["homme", "femme"]).optional(),
+  address: z.string().optional(),
+  nomMedecinDeclarant: z.string().optional(),
+  prenomMedecinDeclarant: z.string().optional(),
+  serviceDeclarant: z.string().optional(),
 })
 
 type DeclarationFormData = z.infer<typeof declarationSchema>
@@ -272,6 +286,7 @@ export default function DeclarationForm() {
 
   // UI state
   const [loading, setLoading] = useState(false)
+  const [brouillonLoading, setBrouillonLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [pendingCasId, setPendingCasId] = useState<string | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -288,6 +303,10 @@ export default function DeclarationForm() {
   const [casSearchLoading, setCasSearchLoading] = useState(false)
   const [selectedCasSimilaire, setSelectedCasSimilaire] = useState<CasSearchResult | null>(null)
 
+  // Prevent circular DOB <-> age updates
+  const ageChangedByUser = useRef(false)
+  const dobChangedByUser = useRef(false)
+
   // Form
   const {
     register,
@@ -295,6 +314,7 @@ export default function DeclarationForm() {
     watch,
     setValue,
     control,
+    getValues,
     formState: { errors },
   } = useForm<DeclarationFormData>({
     resolver: zodResolver(declarationSchema),
@@ -308,6 +328,7 @@ export default function DeclarationForm() {
 
   // Watched values
   const dateOfBirth = watch("dateOfBirth")
+  const ageAns = watch("ageAns")
   const wilayadId = watch("wilayadId")
   const estEtranger = watch("estEtranger")
   const estHospitalise = watch("estHospitalise")
@@ -320,8 +341,15 @@ export default function DeclarationForm() {
   // ---------------------------------------------------------------------------
   // Effects
   // ---------------------------------------------------------------------------
+
+  // DOB → age (only when DOB changes by user, not by age calculation)
   useEffect(() => {
+    if (ageChangedByUser.current) {
+      ageChangedByUser.current = false
+      return
+    }
     if (dateOfBirth) {
+      dobChangedByUser.current = true
       const age = calculateAgeDetailed(dateOfBirth)
       if (age) {
         setValue("ageAns", age.ans)
@@ -329,7 +357,24 @@ export default function DeclarationForm() {
         setValue("ageJours", age.jours)
       }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateOfBirth, setValue])
+
+  // ageAns → DOB (set to June 30 of the calculated year)
+  useEffect(() => {
+    if (dobChangedByUser.current) {
+      dobChangedByUser.current = false
+      return
+    }
+    if (ageAns !== undefined && ageAns !== null && !isNaN(ageAns as number)) {
+      ageChangedByUser.current = true
+      const year = new Date().getFullYear() - (ageAns as number)
+      // June 30 as default birthday when only age is known
+      const dobStr = `${year}-06-30`
+      setValue("dateOfBirth", dobStr)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ageAns, setValue])
 
   useEffect(() => {
     if (wilayadId) {
@@ -408,70 +453,79 @@ export default function DeclarationForm() {
   }, [casSearchQuery, searchCasSimilaire])
 
   // ---------------------------------------------------------------------------
-  // Submit
+  // Build payload helper
+  // ---------------------------------------------------------------------------
+  const buildPayload = (data: Partial<DeclarationFormData>, statut: string) => ({
+    patient: {
+      firstName: data.firstName ?? "",
+      lastName: data.lastName ?? "",
+      dateOfBirth: data.dateOfBirth || null,
+      sex: data.sex ?? "homme",
+      address: data.address ?? "",
+      communeId: data.communeId || null,
+      phone: data.phone || null,
+    },
+    maladieId: data.maladieId,
+    dateDebutSymptomes: data.dateDebutSymptomes || null,
+    dateDiagnostic: data.dateDiagnostic || null,
+    modeConfirmation: data.modeConfirmation || null,
+    nin: data.nin || null,
+    ageAns: data.ageAns ?? null,
+    ageMois: data.ageMois ?? null,
+    ageJours: data.ageJours ?? null,
+    profession: data.profession || null,
+    emailPatient: data.emailPatient || null,
+    lieuTravail: data.lieuTravail || null,
+    estEtranger: data.estEtranger ?? null,
+    nationalite: data.nationalite || null,
+    symptomesTexte: data.symptomesTexte || null,
+    observation: data.observation || null,
+    atcd: data.atcd || null,
+    casSimilaire: data.casSimilaire ?? null,
+    estHospitalise: data.estHospitalise ?? null,
+    dateHospitalisation: data.dateHospitalisation || null,
+    estEvacue: data.estEvacue ?? null,
+    dateEvacuation: data.dateEvacuation || null,
+    structureEvacuation: data.structureEvacuation || null,
+    evolution: data.evolution || null,
+    dateSortie: data.dateSortie || null,
+    dateDeces: data.dateDeces || null,
+    serviceDeclarant: data.serviceDeclarant || null,
+    moisDeclaration: data.moisDeclaration ?? null,
+    anneeDeclaration: data.anneeDeclaration ?? null,
+    etablissementId: data.etablissementId || null,
+    service: data.service,
+    notesCliniques: data.notesCliniques || null,
+    resultatLabo: data.resultatLabo || null,
+    ficheSpecifiqueType: ficheSpecifiqueSlug || null,
+    donneesSpecifiques: ficheSpecifiqueSlug ? (data as Record<string, unknown>).fiche ?? null : null,
+    nationaliteCode: data.nationaliteCode || null,
+    casSimilaireId: selectedCasSimilaire?.id || null,
+    structureHospitalisationId: data.structureHospitalisationId || null,
+    serviceHospitalisation: data.serviceHospitalisation || null,
+    symptomeIds: selectedSymptomeIds,
+    lieux: lieux.filter(l => l.nom.trim()),
+    resultatsLabo: resultatsLabo.filter(r => r.typePrelevement && r.datePrelevement),
+    // Doctor fields
+    nomMedecinDeclarant: data.nomMedecinDeclarant || null,
+    prenomMedecinDeclarant: data.prenomMedecinDeclarant || null,
+    medecinDeclarantId: data.medecinDeclarantId || null,
+    statut,
+  })
+
+  // ---------------------------------------------------------------------------
+  // Submit — Validate & confirm
   // ---------------------------------------------------------------------------
   const onSubmit = async (data: DeclarationFormData) => {
     setLoading(true)
     setError(null)
     try {
-      const payload = {
-        patient: {
-          firstName: data.firstName,
-          lastName: data.lastName,
-          dateOfBirth: data.dateOfBirth || null,
-          sex: data.sex,
-          address: data.address,
-          communeId: data.communeId || null,
-          phone: data.phone || null,
-        },
-        maladieId: data.maladieId,
-        dateDebutSymptomes: data.dateDebutSymptomes,
-        dateDiagnostic: data.dateDiagnostic,
-        modeConfirmation: data.modeConfirmation || null,
-        // Phase C fields
-        nin: data.nin || null,
-        ageAns: data.ageAns ?? null,
-        ageMois: data.ageMois ?? null,
-        ageJours: data.ageJours ?? null,
-        profession: data.profession || null,
-        emailPatient: data.emailPatient || null,
-        lieuTravail: data.lieuTravail || null,
-        estEtranger: data.estEtranger ?? null,
-        nationalite: data.nationalite || null,
-        symptomesTexte: data.symptomesTexte || null,
-        observation: data.observation || null,
-        atcd: data.atcd || null,
-        casSimilaire: data.casSimilaire ?? null,
-        estHospitalise: data.estHospitalise ?? null,
-        dateHospitalisation: data.dateHospitalisation || null,
-        estEvacue: data.estEvacue ?? null,
-        dateEvacuation: data.dateEvacuation || null,
-        structureEvacuation: data.structureEvacuation || null,
-        evolution: data.evolution || null,
-        dateSortie: data.dateSortie || null,
-        dateDeces: data.dateDeces || null,
-        serviceDeclarant: data.serviceDeclarant || null,
-        moisDeclaration: data.moisDeclaration ?? null,
-        anneeDeclaration: data.anneeDeclaration ?? null,
-        // Medical
-        etablissementId: data.etablissementId || null,
-        service: data.service,
-        notesCliniques: data.notesCliniques || null,
-        resultatLabo: data.resultatLabo || null,
-        // Phase D
-        ficheSpecifiqueType: ficheSpecifiqueSlug || null,
-        donneesSpecifiques: ficheSpecifiqueSlug ? (data as Record<string, unknown>).fiche ?? null : null,
-        // Phase E — Enhanced features
-        nationaliteCode: data.nationaliteCode || null,
-        casSimilaireId: selectedCasSimilaire?.id || null,
-        evaluationClinique: data.evaluationClinique ? { notes: data.evaluationClinique } : null,
-        structureHospitalisationId: data.structureHospitalisationId || null,
-        serviceHospitalisation: data.serviceHospitalisation || null,
-        // New array fields
-        symptomeIds: selectedSymptomeIds,
-        lieux: lieux.filter(l => l.nom.trim()),
-        resultatsLabo: resultatsLabo.filter(r => r.typePrelevement && r.datePrelevement),
-      }
+      // Derive statut from observation
+      let statut = "nouveau"
+      if (data.observation === "cas_confirme") statut = "confirme"
+      else if (data.observation === "cas_suspect") statut = "suspect"
+
+      const payload = buildPayload(data, statut)
 
       const res = await fetch("/api/cas", {
         method: "POST",
@@ -503,6 +557,43 @@ export default function DeclarationForm() {
   }
 
   // ---------------------------------------------------------------------------
+  // Save as brouillon — no full validation
+  // ---------------------------------------------------------------------------
+  const saveBrouillon = async () => {
+    setBrouillonLoading(true)
+    setError(null)
+    try {
+      const raw = getValues()
+      // Minimal parse
+      const parsed = brouillonSchema.safeParse(raw)
+      const data = parsed.success ? parsed.data : raw
+
+      const payload = buildPayload(data, "brouillon")
+
+      const res = await fetch("/api/cas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const err = await res.json()
+        throw new Error(err.error ?? "Erreur lors de l'enregistrement du brouillon")
+      }
+
+      const cas = await res.json()
+      toast.success("Brouillon enregistré")
+      router.push(`/declarations/${cas.id}`)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erreur inconnue"
+      setError(msg)
+      toast.error(msg)
+    } finally {
+      setBrouillonLoading(false)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
   // OCR Apply
   // ---------------------------------------------------------------------------
   const applyOcrData = (data: OcrScanResult["data"]) => {
@@ -529,14 +620,9 @@ export default function DeclarationForm() {
     if (lieux.length >= 4) return
     setLieux([...lieux, { nom: "", type: "", adresse: "", communeId: "", dateDebut: "", dateFin: "" }])
   }
-
-  const removeLieu = (idx: number) => {
-    setLieux(lieux.filter((_, i) => i !== idx))
-  }
-
-  const updateLieu = (idx: number, field: keyof LieuEntry, value: string) => {
+  const removeLieu = (idx: number) => setLieux(lieux.filter((_, i) => i !== idx))
+  const updateLieu = (idx: number, field: keyof LieuEntry, value: string) =>
     setLieux(lieux.map((l, i) => i === idx ? { ...l, [field]: value } : l))
-  }
 
   // ---------------------------------------------------------------------------
   // Resultat Labo helpers
@@ -547,14 +633,9 @@ export default function DeclarationForm() {
       antibiogramme: "", laboratoire: "", notes: "",
     }])
   }
-
-  const removeResultatLabo = (idx: number) => {
-    setResultatsLabo(resultatsLabo.filter((_, i) => i !== idx))
-  }
-
-  const updateResultatLabo = (idx: number, field: keyof ResultatLaboEntry, value: string) => {
+  const removeResultatLabo = (idx: number) => setResultatsLabo(resultatsLabo.filter((_, i) => i !== idx))
+  const updateResultatLabo = (idx: number, field: keyof ResultatLaboEntry, value: string) =>
     setResultatsLabo(resultatsLabo.map((r, i) => i === idx ? { ...r, [field]: value } : r))
-  }
 
   // ---------------------------------------------------------------------------
   // Symptom toggle
@@ -568,8 +649,7 @@ export default function DeclarationForm() {
   // ---------------------------------------------------------------------------
   // Style helpers
   // ---------------------------------------------------------------------------
-  const inputCls = (hasError: boolean) =>
-    cn("input w-full", hasError && "input-error")
+  const inputCls = (hasError: boolean) => cn("input w-full", hasError && "input-error")
 
   const selectedMaladie = maladies.find(m => m.id === maladieId)
 
@@ -600,19 +680,13 @@ export default function DeclarationForm() {
               : "border-gray-200 text-gray-600 hover:border-gray-300"
           )}
         >
-          <input
-            type="radio"
-            className="sr-only"
-            checked={value === val}
-            onChange={() => onChange(val)}
-          />
+          <input type="radio" className="sr-only" checked={value === val} onChange={() => onChange(val)} />
           {val ? "Oui" : "Non"}
         </label>
       ))}
     </div>
   )
 
-  // Group symptomes by category
   const symptomesByCategory = SYMPTOM_CATEGORIES.map(cat => ({
     ...cat,
     items: symptomes.filter(s => s.categorie === cat.key),
@@ -658,7 +732,7 @@ export default function DeclarationForm() {
       <form onSubmit={handleSubmit(onSubmit)} className="max-w-3xl space-y-6">
 
         {/* ── Section 0 — En-tête ───────────────────────────────────────── */}
-        <FormHeaderSection register={register} errors={errors} />
+        <FormHeaderSection register={register} errors={errors} setValue={setValue} watch={watch} />
 
         {/* ── Section 1 — Informations Administratives ─────────────────── */}
         <div className="card">
@@ -667,53 +741,28 @@ export default function DeclarationForm() {
 
             {/* Date de déclaration */}
             <div>
-              <label className="label">
-                Date de déclaration <span className="text-red-500">*</span>
-              </label>
-              <input
-                {...register("dateDeclaration")}
-                type="date"
-                className={inputCls(false)}
-              />
+              <label className="label">Date de déclaration</label>
+              <input {...register("dateDeclaration")} type="date" className={inputCls(false)} />
             </div>
 
             {/* Nom */}
             <div>
-              <label className="label">
-                Nom <span className="text-red-500">*</span>
-              </label>
-              <input
-                {...register("lastName")}
-                className={inputCls(!!errors.lastName)}
-                placeholder="Benali"
-              />
+              <label className="label">Nom <span className="text-red-500">*</span></label>
+              <input {...register("lastName")} className={inputCls(!!errors.lastName)} placeholder="Benali" />
               <FieldError msg={errors.lastName?.message} />
             </div>
 
             {/* Prénom */}
             <div>
-              <label className="label">
-                Prénom <span className="text-red-500">*</span>
-              </label>
-              <input
-                {...register("firstName")}
-                className={inputCls(!!errors.firstName)}
-                placeholder="Ahmed"
-              />
+              <label className="label">Prénom <span className="text-red-500">*</span></label>
+              <input {...register("firstName")} className={inputCls(!!errors.firstName)} placeholder="Ahmed" />
               <FieldError msg={errors.firstName?.message} />
             </div>
 
             {/* NIN */}
             <div>
-              <label className="label">
-                NIN (Numéro d&apos;Identification National)
-              </label>
-              <input
-                {...register("nin")}
-                className={inputCls(false)}
-                placeholder="18 caractères max"
-                maxLength={18}
-              />
+              <label className="label">NIN (Numéro d&apos;Identification National)</label>
+              <input {...register("nin")} className={inputCls(false)} placeholder="18 caractères max" maxLength={18} />
             </div>
 
             {/* Date de naissance */}
@@ -723,6 +772,11 @@ export default function DeclarationForm() {
                 {...register("dateOfBirth")}
                 type="date"
                 className={inputCls(false)}
+                onChange={e => {
+                  dobChangedByUser.current = true
+                  ageChangedByUser.current = false
+                  register("dateOfBirth").onChange(e)
+                }}
               />
             </div>
 
@@ -738,6 +792,11 @@ export default function DeclarationForm() {
                     max={150}
                     className={inputCls(false)}
                     placeholder="Ans"
+                    onChange={e => {
+                      ageChangedByUser.current = true
+                      dobChangedByUser.current = false
+                      register("ageAns", { valueAsNumber: true }).onChange(e)
+                    }}
                   />
                 </div>
                 <div className="flex-1">
@@ -765,9 +824,7 @@ export default function DeclarationForm() {
 
             {/* Sexe */}
             <div className="col-span-2">
-              <label className="label">
-                Sexe <span className="text-red-500">*</span>
-              </label>
+              <label className="label">Sexe <span className="text-red-500">*</span></label>
               <div className="flex gap-4">
                 {(["homme", "femme"] as const).map(s => {
                   const sexValue = watch("sex")
@@ -795,9 +852,7 @@ export default function DeclarationForm() {
               <label className="label">Wilaya de résidence</label>
               <select {...register("wilayadId")} className={inputCls(false)}>
                 <option value="">Sélectionner une wilaya...</option>
-                {wilayas.map(w => (
-                  <option key={w.id} value={w.id}>{w.nom}</option>
-                ))}
+                {wilayas.map(w => <option key={w.id} value={w.id}>{w.nom}</option>)}
               </select>
             </div>
 
@@ -806,17 +861,13 @@ export default function DeclarationForm() {
               <label className="label">Commune</label>
               <select {...register("communeId")} className={inputCls(false)}>
                 <option value="">Sélectionner une commune...</option>
-                {filteredCommunes.map(c => (
-                  <option key={c.id} value={c.id}>{c.nom}</option>
-                ))}
+                {filteredCommunes.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
               </select>
             </div>
 
             {/* Adresse */}
             <div className="col-span-2">
-              <label className="label">
-                Adresse complète <span className="text-red-500">*</span>
-              </label>
+              <label className="label">Adresse complète <span className="text-red-500">*</span></label>
               <textarea
                 {...register("address")}
                 rows={2}
@@ -856,7 +907,7 @@ export default function DeclarationForm() {
               <input {...register("lieuTravail")} className={inputCls(false)} placeholder="Nom de l'établissement" />
             </div>
 
-            {/* ── Feature 1: Nationalité ─────────────────────────────────── */}
+            {/* Nationalité */}
             <div className="col-span-2">
               <label className="label">Ressortissant étranger</label>
               <ToggleGroup value={estEtranger} onChange={val => setValue("estEtranger", val)} />
@@ -864,9 +915,7 @@ export default function DeclarationForm() {
 
             {estEtranger && (
               <div className="col-span-2">
-                <label className="label">
-                  Nationalité <span className="text-red-500">*</span>
-                </label>
+                <label className="label">Nationalité <span className="text-red-500">*</span></label>
                 <SearchableSelect
                   options={NATIONALITIES.map(n => ({ value: n.code, label: n.label }))}
                   value={watch("nationaliteCode") ?? ""}
@@ -882,21 +931,10 @@ export default function DeclarationForm() {
           </div>
         </div>
 
-        {/* ── Section 2 — Évaluation, Hospitalisation & Évacuation ─────── */}
+        {/* ── Section 2 — Hospitalisation & Évacuation ─────────────────── */}
         <div className="card">
-          <SectionHeader letter="2" title="Évaluation, Hospitalisation & Évacuation" />
+          <SectionHeader letter="2" title="Hospitalisation & Évacuation" />
           <div className="p-5 grid grid-cols-2 gap-4">
-
-            {/* Évaluation clinique */}
-            <div className="col-span-2">
-              <label className="label">Évaluation clinique</label>
-              <textarea
-                {...register("evaluationClinique")}
-                rows={3}
-                className={cn(inputCls(false), "h-auto py-2 resize-none")}
-                placeholder="État général, constantes, examen clinique..."
-              />
-            </div>
 
             {/* Hospitalisation */}
             <div className="col-span-2">
@@ -914,9 +952,7 @@ export default function DeclarationForm() {
                   <label className="label">Structure d&apos;hospitalisation</label>
                   <select {...register("structureHospitalisationId")} className={inputCls(false)}>
                     <option value="">Sélectionner...</option>
-                    {etablissements.map(e => (
-                      <option key={e.id} value={e.id}>{e.nom}</option>
-                    ))}
+                    {etablissements.map(e => <option key={e.id} value={e.id}>{e.nom}</option>)}
                   </select>
                 </div>
                 <div>
@@ -944,11 +980,7 @@ export default function DeclarationForm() {
                 </div>
                 <div>
                   <label className="label">Structure d&apos;évacuation</label>
-                  <input
-                    {...register("structureEvacuation")}
-                    className={inputCls(false)}
-                    placeholder="Nom de la structure"
-                  />
+                  <input {...register("structureEvacuation")} className={inputCls(false)} placeholder="Nom de la structure" />
                 </div>
               </>
             )}
@@ -991,9 +1023,7 @@ export default function DeclarationForm() {
 
               {evolution === "deces" && (
                 <div className="mt-3">
-                  <label className="label">
-                    Date du décès <span className="text-red-500">*</span>
-                  </label>
+                  <label className="label">Date du décès <span className="text-red-500">*</span></label>
                   <input {...register("dateDeces")} type="date" className={inputCls(false)} />
                 </div>
               )}
@@ -1008,9 +1038,7 @@ export default function DeclarationForm() {
 
             {/* Maladie */}
             <div className="col-span-2">
-              <label className="label">
-                Maladie <span className="text-red-500">*</span>
-              </label>
+              <label className="label">Maladie <span className="text-red-500">*</span></label>
               <DiseaseCombobox
                 grouped={groupedMaladies}
                 value={watch("maladieId")}
@@ -1026,50 +1054,36 @@ export default function DeclarationForm() {
               />
             </div>
 
-            {/* Dates */}
+            {/* Dates — not required */}
             <div>
-              <label className="label">
-                Date d&apos;apparition des symptômes <span className="text-red-500">*</span>
-              </label>
+              <label className="label">Date d&apos;apparition des symptômes</label>
               <input
                 {...register("dateDebutSymptomes")}
                 type="date"
-                className={inputCls(!!errors.dateDebutSymptomes)}
+                className={inputCls(false)}
               />
-              <FieldError msg={errors.dateDebutSymptomes?.message} />
             </div>
             <div>
-              <label className="label">
-                Date du diagnostic <span className="text-red-500">*</span>
-              </label>
+              <label className="label">Date du diagnostic</label>
               <input
                 {...register("dateDiagnostic")}
                 type="date"
-                className={inputCls(!!errors.dateDiagnostic)}
+                className={inputCls(false)}
               />
-              <FieldError msg={errors.dateDiagnostic?.message} />
             </div>
 
-            {/* ── Feature 2: Codage Symptômes (multi-select tags) ────── */}
+            {/* Symptômes codés */}
             <div className="col-span-2">
               <label className="label">Symptômes codés</label>
-              {/* Selected tags */}
               {selectedSymptomeIds.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {selectedSymptomeIds.map(id => {
                     const s = symptomes.find(x => x.id === id)
                     if (!s) return null
                     return (
-                      <span
-                        key={id}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200"
-                      >
+                      <span key={id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                         {s.nom}
-                        <button
-                          type="button"
-                          onClick={() => toggleSymptome(id)}
-                          className="hover:text-blue-900"
-                        >
+                        <button type="button" onClick={() => toggleSymptome(id)} className="hover:text-blue-900">
                           <X size={12} />
                         </button>
                       </span>
@@ -1077,7 +1091,6 @@ export default function DeclarationForm() {
                   })}
                 </div>
               )}
-              {/* Grouped symptom checkboxes */}
               <div className="border border-gray-200 rounded-lg max-h-52 overflow-y-auto">
                 {symptomesByCategory.map(cat => (
                   <div key={cat.key}>
@@ -1119,27 +1132,33 @@ export default function DeclarationForm() {
               />
             </div>
 
-            {/* Observation */}
+            {/* Observation — drives statut */}
             <div className="col-span-2">
-              <label className="label">Observation</label>
+              <label className="label">
+                Observation
+                <span className="ml-2 text-[11px] text-gray-400 font-normal">(détermine le statut du cas)</span>
+              </label>
               <div className="flex gap-4">
                 {([
-                  { value: "cas_confirme", label: "Cas confirmé" },
-                  { value: "cas_suspect", label: "Cas suspect" },
+                  { value: "cas_confirme", label: "Cas confirmé", statut: "Statut → Confirmé" },
+                  { value: "cas_suspect", label: "Cas suspect", statut: "Statut → Suspect" },
                 ] as const).map(opt => {
                   const obsValue = watch("observation")
                   return (
                     <label
                       key={opt.value}
                       className={cn(
-                        "flex items-center gap-2 px-4 py-2.5 rounded-lg border cursor-pointer transition-all flex-1 justify-center text-sm",
+                        "flex flex-col items-center gap-1 px-4 py-2.5 rounded-lg border cursor-pointer transition-all flex-1 justify-center text-sm",
                         obsValue === opt.value
                           ? "border-[#1B4F8A] bg-[#EBF1FA] text-[#1B4F8A] font-medium"
                           : "border-gray-200 text-gray-600 hover:border-gray-300"
                       )}
                     >
                       <input type="radio" value={opt.value} {...register("observation")} className="sr-only" />
-                      {opt.label}
+                      <span>{opt.label}</span>
+                      {obsValue === opt.value && (
+                        <span className="text-[10px] opacity-70">{opt.statut}</span>
+                      )}
                     </label>
                   )
                 })}
@@ -1187,7 +1206,7 @@ export default function DeclarationForm() {
               />
             </div>
 
-            {/* ── Feature 4: Cas Similaire (search & link) ───────────── */}
+            {/* Cas similaire */}
             <div className="col-span-2">
               <label className="label">Cas similaire dans l&apos;entourage</label>
               <ToggleGroup value={casSimilaire} onChange={val => {
@@ -1268,63 +1287,33 @@ export default function DeclarationForm() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="label">Nom du lieu</label>
-                    <input
-                      value={lieu.nom}
-                      onChange={e => updateLieu(idx, "nom", e.target.value)}
-                      className={inputCls(false)}
-                      placeholder="Ex: Marché Mdina Jdida"
-                    />
+                    <input value={lieu.nom} onChange={e => updateLieu(idx, "nom", e.target.value)} className={inputCls(false)} placeholder="Ex: Marché Mdina Jdida" />
                   </div>
                   <div>
                     <label className="label">Type</label>
-                    <select
-                      value={lieu.type}
-                      onChange={e => updateLieu(idx, "type", e.target.value)}
-                      className={inputCls(false)}
-                    >
+                    <select value={lieu.type} onChange={e => updateLieu(idx, "type", e.target.value)} className={inputCls(false)}>
                       <option value="">Sélectionner...</option>
-                      {LIEU_TYPES.map(t => (
-                        <option key={t.code} value={t.code}>{t.label}</option>
-                      ))}
+                      {LIEU_TYPES.map(t => <option key={t.code} value={t.code}>{t.label}</option>)}
                     </select>
                   </div>
                   <div className="col-span-2">
                     <label className="label">Adresse</label>
-                    <input
-                      value={lieu.adresse}
-                      onChange={e => updateLieu(idx, "adresse", e.target.value)}
-                      className={inputCls(false)}
-                      placeholder="Adresse du lieu..."
-                    />
+                    <input value={lieu.adresse} onChange={e => updateLieu(idx, "adresse", e.target.value)} className={inputCls(false)} placeholder="Adresse du lieu..." />
                   </div>
                   <div>
                     <label className="label">Date début fréquentation</label>
-                    <input
-                      type="date"
-                      value={lieu.dateDebut}
-                      onChange={e => updateLieu(idx, "dateDebut", e.target.value)}
-                      className={inputCls(false)}
-                    />
+                    <input type="date" value={lieu.dateDebut} onChange={e => updateLieu(idx, "dateDebut", e.target.value)} className={inputCls(false)} />
                   </div>
                   <div>
                     <label className="label">Date fin fréquentation</label>
-                    <input
-                      type="date"
-                      value={lieu.dateFin}
-                      onChange={e => updateLieu(idx, "dateFin", e.target.value)}
-                      className={inputCls(false)}
-                    />
+                    <input type="date" value={lieu.dateFin} onChange={e => updateLieu(idx, "dateFin", e.target.value)} className={inputCls(false)} />
                   </div>
                 </div>
               </div>
             ))}
 
             {lieux.length < 4 && (
-              <button
-                type="button"
-                onClick={addLieu}
-                className="btn btn-secondary btn-sm"
-              >
+              <button type="button" onClick={addLieu} className="btn btn-secondary btn-sm">
                 <Plus size={14} />
                 Ajouter un lieu ({lieux.length}/4)
               </button>
@@ -1347,7 +1336,6 @@ export default function DeclarationForm() {
                   </button>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  {/* Type de prélèvement — searchable combobox (Feature 8) */}
                   <div>
                     <label className="label">Type de prélèvement</label>
                     <SearchableSelect
@@ -1359,14 +1347,8 @@ export default function DeclarationForm() {
                   </div>
                   <div>
                     <label className="label">Date du prélèvement</label>
-                    <input
-                      type="date"
-                      value={r.datePrelevement}
-                      onChange={e => updateResultatLabo(idx, "datePrelevement", e.target.value)}
-                      className={inputCls(false)}
-                    />
+                    <input type="date" value={r.datePrelevement} onChange={e => updateResultatLabo(idx, "datePrelevement", e.target.value)} className={inputCls(false)} />
                   </div>
-                  {/* Germe — searchable (Feature 5) */}
                   <div>
                     <label className="label">Germe identifié</label>
                     <SearchableSelect
@@ -1378,11 +1360,7 @@ export default function DeclarationForm() {
                   </div>
                   <div>
                     <label className="label">Résultat</label>
-                    <select
-                      value={r.resultat}
-                      onChange={e => updateResultatLabo(idx, "resultat", e.target.value)}
-                      className={inputCls(false)}
-                    >
+                    <select value={r.resultat} onChange={e => updateResultatLabo(idx, "resultat", e.target.value)} className={inputCls(false)}>
                       <option value="">Sélectionner...</option>
                       <option value="positif">Positif</option>
                       <option value="negatif">Négatif</option>
@@ -1391,40 +1369,21 @@ export default function DeclarationForm() {
                   </div>
                   <div>
                     <label className="label">Laboratoire</label>
-                    <input
-                      value={r.laboratoire}
-                      onChange={e => updateResultatLabo(idx, "laboratoire", e.target.value)}
-                      className={inputCls(false)}
-                      placeholder="Nom du laboratoire..."
-                    />
+                    <input value={r.laboratoire} onChange={e => updateResultatLabo(idx, "laboratoire", e.target.value)} className={inputCls(false)} placeholder="Nom du laboratoire..." />
                   </div>
                   <div>
                     <label className="label">Antibiogramme</label>
-                    <input
-                      value={r.antibiogramme}
-                      onChange={e => updateResultatLabo(idx, "antibiogramme", e.target.value)}
-                      className={inputCls(false)}
-                      placeholder="Résultat antibiogramme..."
-                    />
+                    <input value={r.antibiogramme} onChange={e => updateResultatLabo(idx, "antibiogramme", e.target.value)} className={inputCls(false)} placeholder="Résultat antibiogramme..." />
                   </div>
                   <div className="col-span-2">
                     <label className="label">Notes</label>
-                    <input
-                      value={r.notes}
-                      onChange={e => updateResultatLabo(idx, "notes", e.target.value)}
-                      className={inputCls(false)}
-                      placeholder="Notes supplémentaires..."
-                    />
+                    <input value={r.notes} onChange={e => updateResultatLabo(idx, "notes", e.target.value)} className={inputCls(false)} placeholder="Notes supplémentaires..." />
                   </div>
                 </div>
               </div>
             ))}
 
-            <button
-              type="button"
-              onClick={addResultatLabo}
-              className="btn btn-secondary btn-sm"
-            >
+            <button type="button" onClick={addResultatLabo} className="btn btn-secondary btn-sm">
               <Plus size={14} />
               Ajouter un prélèvement
             </button>
@@ -1473,10 +1432,15 @@ export default function DeclarationForm() {
         <div className="flex gap-3 pb-8">
           <button
             type="button"
-            onClick={() => router.back()}
+            onClick={saveBrouillon}
+            disabled={brouillonLoading}
             className="btn btn-secondary btn-lg"
           >
-            Annuler
+            {brouillonLoading ? (
+              <><Loader2 size={14} className="animate-spin" /> Enregistrement...</>
+            ) : (
+              <><FileText size={14} /> Enregistrer en tant que brouillon</>
+            )}
           </button>
           <button
             type="submit"
@@ -1484,15 +1448,9 @@ export default function DeclarationForm() {
             className="btn btn-success btn-lg flex-1"
           >
             {loading ? (
-              <>
-                <Loader2 size={15} className="animate-spin" />
-                Enregistrement...
-              </>
+              <><Loader2 size={15} className="animate-spin" /> Enregistrement...</>
             ) : (
-              <>
-                <CheckCircle2 size={15} />
-                Valider la Déclaration
-              </>
+              <><CheckCircle2 size={15} /> Valider la Déclaration</>
             )}
           </button>
         </div>

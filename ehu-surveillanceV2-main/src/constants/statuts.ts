@@ -1,6 +1,12 @@
 import { CasStatut } from "@/types"
 
 export const CAS_STATUTS: Record<CasStatut, { label: string; color: string; bg: string; border: string }> = {
+  brouillon: {
+    label: "Brouillon",
+    color: "#9333EA",
+    bg: "#F5F3FF",
+    border: "#DDD6FE",
+  },
   nouveau: {
     label: "Nouveau",
     color: "#1B4F8A",
@@ -18,6 +24,12 @@ export const CAS_STATUTS: Record<CasStatut, { label: string; color: string; bg: 
     color: "#DC2626",
     bg: "#FEF2F2",
     border: "#FECACA",
+  },
+  suspect: {
+    label: "Suspect",
+    color: "#EA580C",
+    bg: "#FFF7ED",
+    border: "#FED7AA",
   },
   infirme: {
     label: "Infirmé",

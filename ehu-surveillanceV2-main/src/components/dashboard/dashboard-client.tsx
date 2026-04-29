@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import dynamic from "next/dynamic"
-import DashboardFilters from "./dashboard-filters"
+import DashboardFilters, { type DashboardFiltersState } from "./dashboard-filters"
 import EpidemicCurve from "./epidemic-curve"
 import DiseaseDistribution from "./disease-distribution"
 import StatCards from "./stat-cards"
@@ -22,7 +22,8 @@ const EpidemicMap = dynamic(() => import("@/components/maps/epidemic-map"), {
 })
 
 interface Maladie { id: string; nom: string }
-interface Commune { id: string; nom: string }
+interface Commune { id: string; nom: string; wilayadId?: string }
+interface Wilaya { id: string; nom: string; code: string }
 
 interface DashboardData {
   stats: { totalActifs: number; totalAlertes: number; totalMaladies: number }
@@ -34,11 +35,17 @@ interface DashboardData {
 interface Props {
   maladies: Maladie[]
   communes: Commune[]
+  wilayas: Wilaya[]
   userName: string
 }
 
-export default function DashboardClient({ maladies, communes, userName }: Props) {
-  const [filters, setFilters] = useState({ maladieId: "", communeId: "", days: "30" })
+export default function DashboardClient({ maladies, communes, wilayas, userName }: Props) {
+  const [filters, setFilters] = useState<DashboardFiltersState>({
+    days: "30",
+    maladieIds: [],
+    wilayadIds: [],
+    communeId: "",
+  })
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
@@ -47,7 +54,10 @@ export default function DashboardClient({ maladies, communes, userName }: Props)
     setLoading(true)
     setError(false)
     try {
-      const params = new URLSearchParams(filters)
+      const params = new URLSearchParams({ days: filters.days })
+      if (filters.communeId) params.set("communeId", filters.communeId)
+      if (filters.maladieIds.length > 0) params.set("maladieIds", filters.maladieIds.join(","))
+      if (filters.wilayadIds.length > 0) params.set("wilayadIds", filters.wilayadIds.join(","))
       const res = await fetch(`/api/stats/dashboard?${params}`)
       if (!res.ok) throw new Error()
       const json = await res.json()
@@ -69,7 +79,13 @@ export default function DashboardClient({ maladies, communes, userName }: Props)
           <h1 className="page-title">Tableau de Bord</h1>
           <p className="page-subtitle">Bienvenue, {userName}</p>
         </div>
-        <DashboardFilters maladies={maladies} communes={communes} filters={filters} onChange={setFilters} />
+        <DashboardFilters
+          maladies={maladies}
+          communes={communes}
+          wilayas={wilayas}
+          filters={filters}
+          onChange={setFilters}
+        />
       </div>
 
       {loading && !data ? (
@@ -85,10 +101,8 @@ export default function DashboardClient({ maladies, communes, userName }: Props)
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Stat Cards */}
           <StatCards stats={data!.stats} />
 
-          {/* Map + Disease Distribution */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 card p-5">
               <div className="flex items-center justify-between mb-4">
@@ -101,15 +115,10 @@ export default function DashboardClient({ maladies, communes, userName }: Props)
             </div>
             <div className="card p-5">
               <p className="card-title mb-4">Répartition par Maladie</p>
-              {loading ? (
-                <Sk w="100%" h={280} rounded={8} />
-              ) : (
-                <DiseaseDistribution data={data!.diseaseDistribution} />
-              )}
+              {loading ? <Sk w="100%" h={280} rounded={8} /> : <DiseaseDistribution data={data!.diseaseDistribution} />}
             </div>
           </div>
 
-          {/* Epidemic Curve */}
           <div className="card p-5">
             <div className="flex items-center justify-between mb-4">
               <p className="card-title">Courbe Épidémique</p>
@@ -117,11 +126,7 @@ export default function DashboardClient({ maladies, communes, userName }: Props)
                 {filters.days} derniers jours
               </span>
             </div>
-            {loading ? (
-              <Sk w="100%" h={260} rounded={8} />
-            ) : (
-              <EpidemicCurve data={data!.epidemicCurve} />
-            )}
+            {loading ? <Sk w="100%" h={260} rounded={8} /> : <EpidemicCurve data={data!.epidemicCurve} />}
           </div>
         </div>
       )}

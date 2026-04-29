@@ -52,7 +52,7 @@ export default async function InvestigationsPage() {
                     <p className="text-sm font-medium text-gray-800">{inv.cas.patient.firstName} {inv.cas.patient.lastName}</p>
                     <p className="text-xs text-gray-400">{inv.cas.codeCas}</p>
                   </td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{inv.cas.maladie.nom}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">{inv.cas.maladie?.nom ?? "—"}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{inv.cas.commune?.nom ?? "—"}</td>
                   <td className="px-4 py-3 text-sm text-gray-600">{inv.contacts.length}</td>
                   <td className="px-4 py-3 text-sm text-gray-500">{formatDate(inv.dateDebut)}</td>

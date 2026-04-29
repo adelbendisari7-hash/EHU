@@ -76,8 +76,8 @@ export default async function CasDetailPage({ params }: { params: Promise<{ casI
           <CasExportPdfButton cas={{
             codeCas: cas.codeCas,
             statut: cas.statut,
-            maladie: cas.maladie.nom,
-            codeCim10: cas.maladie.codeCim10,
+            maladie: cas.maladie?.nom ?? "—",
+            codeCim10: cas.maladie?.codeCim10 ?? "—",
             patient: {
               identifiant: cas.patient.identifiant,
               firstName: cas.patient.firstName,
@@ -123,7 +123,7 @@ export default async function CasDetailPage({ params }: { params: Promise<{ casI
                 { label: "Téléphone", value: cas.patient.phone ?? "—" },
                 { label: "Commune", value: cas.patient.commune?.nom ?? "—" },
                 { label: "Établissement", value: cas.etablissement?.nom ?? "—" },
-                { label: "Maladie", value: cas.maladie.nom },
+                { label: "Maladie", value: cas.maladie?.nom ?? "—" },
                 { label: "Déclaré le", value: formatDate(cas.createdAt) },
               ].map(item => (
                 <div key={item.label} className="flex justify-between py-1.5 border-b border-gray-50">
@@ -171,8 +171,8 @@ export default async function CasDetailPage({ params }: { params: Promise<{ casI
 
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  { label: "Maladie", value: cas.maladie.nom },
-                  { label: "Code CIM-10", value: cas.maladie.codeCim10 },
+                  { label: "Maladie", value: cas.maladie?.nom ?? "—" },
+                  { label: "Code CIM-10", value: cas.maladie?.codeCim10 ?? "—" },
                   { label: "Début Symptômes", value: formatDate(cas.dateDebutSymptomes) },
                   { label: "Date Diagnostic", value: formatDate(cas.dateDiagnostic) },
                   { label: "Service", value: cas.service },
@@ -240,7 +240,7 @@ export default async function CasDetailPage({ params }: { params: Promise<{ casI
                 <div className="bg-blue-50 rounded-lg p-3 border border-blue-200">
                   <p className="text-xs font-medium text-blue-400 uppercase tracking-wider mb-1">Cas similaire lié</p>
                   <Link href={`/declarations/${cas.casSimilaireRef.id}`} className="text-sm font-medium text-blue-700 hover:text-blue-900">
-                    {cas.casSimilaireRef.codeCas} — {cas.casSimilaireRef.patient.lastName} {cas.casSimilaireRef.patient.firstName} ({cas.casSimilaireRef.maladie.nom})
+                    {cas.casSimilaireRef.codeCas} — {cas.casSimilaireRef.patient.lastName} {cas.casSimilaireRef.patient.firstName} ({cas.casSimilaireRef.maladie?.nom ?? "—"})
                   </Link>
                 </div>
               )}
