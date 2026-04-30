@@ -31,6 +31,12 @@ export default function FormHeaderSection({
   const [serviceSearch, setServiceSearch] = useState("")
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Refs for position:fixed dropdown anchoring
+  const serviceButtonRef = useRef<HTMLButtonElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const [serviceRect, setServiceRect] = useState<DOMRect | null>(null)
+  const [searchRect, setSearchRect] = useState<DOMRect | null>(null)
+
   const nomVal: string = watch("nomMedecinDeclarant") ?? ""
   const prenomVal: string = watch("prenomMedecinDeclarant") ?? ""
   const serviceVal: string = watch("serviceDeclarant") ?? ""
@@ -50,6 +56,10 @@ export default function FormHeaderSection({
       ).slice(0, 8)
     : []
 
+  const filteredServices = SERVICES_EHU.filter(s =>
+    s.nom.toLowerCase().includes(serviceSearch.toLowerCase())
+  )
+
   const selectMedecin = (m: MedecinDeclarant) => {
     setValue("medecinDeclarantId", m.id)
     setValue("nomMedecinDeclarant", m.nom)
@@ -68,9 +78,19 @@ export default function FormHeaderSection({
     setTimeout(() => inputRef.current?.focus(), 50)
   }
 
-  const filteredServices = SERVICES_EHU.filter(s =>
-    s.nom.toLowerCase().includes(serviceSearch.toLowerCase())
-  )
+  const openService = () => {
+    if (serviceButtonRef.current) {
+      setServiceRect(serviceButtonRef.current.getBoundingClientRect())
+    }
+    setServiceOpen(v => !v)
+  }
+
+  const openSearch = () => {
+    if (searchInputRef.current) {
+      setSearchRect(searchInputRef.current.getBoundingClientRect())
+    }
+    setOpen(true)
+  }
 
   const hasErrors = errors.nomMedecinDeclarant || errors.prenomMedecinDeclarant || errors.serviceDeclarant
 
@@ -111,17 +131,30 @@ export default function FormHeaderSection({
                   <div className="relative">
                     <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                     <input
-                      ref={inputRef}
+                      ref={el => {
+                        // assign to both refs
+                        (inputRef as React.MutableRefObject<HTMLInputElement | null>).current = el
+                        ;(searchInputRef as React.MutableRefObject<HTMLInputElement | null>).current = el
+                      }}
                       type="text"
                       value={query}
-                      onChange={e => { setQuery(e.target.value); setOpen(true) }}
-                      onFocus={() => setOpen(true)}
+                      onChange={e => { setQuery(e.target.value); openSearch() }}
+                      onFocus={openSearch}
                       placeholder="Rechercher ou saisir le nom du médecin..."
                       className={cn("input w-full pl-9", hasErrors && "input-error")}
                     />
                   </div>
-                  {open && query.length >= 2 && (
-                    <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+
+                  {/* Suggestions — position:fixed to bypass all overflow:hidden */}
+                  {open && query.length >= 2 && searchRect && (
+                    <div
+                      className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto"
+                      style={{
+                        top: searchRect.bottom + 4,
+                        left: searchRect.left,
+                        width: searchRect.width,
+                      }}
+                    >
                       {suggestions.length > 0 ? (
                         <>
                           {suggestions.map(m => (
@@ -146,7 +179,7 @@ export default function FormHeaderSection({
                       )}
                     </div>
                   )}
-                  {open && <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />}
+                  {open && <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />}
                 </>
               )}
             </div>
@@ -178,15 +211,16 @@ export default function FormHeaderSection({
             )}
           </div>
 
-          {/* Service déclarant — searchable dropdown */}
+          {/* Service déclarant — searchable dropdown with position:fixed */}
           <div>
             <label className="label">
               Service déclarant <span className="text-red-500">*</span>
             </label>
-            <div className="relative">
+            <div>
               <button
+                ref={serviceButtonRef}
                 type="button"
-                onClick={() => setServiceOpen(!serviceOpen)}
+                onClick={openService}
                 className={cn(
                   "input w-full text-left flex items-center justify-between",
                   errors.serviceDeclarant && "input-error"
@@ -197,8 +231,18 @@ export default function FormHeaderSection({
                 </span>
                 <ChevronDown size={14} className="text-gray-400 shrink-0 ml-2" />
               </button>
-              {serviceOpen && (
-                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-hidden">
+
+              {/* Dropdown — position:fixed to bypass all overflow:hidden ancestors */}
+              {serviceOpen && serviceRect && (
+                <div
+                  className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                  style={{
+                    top: serviceRect.bottom + 4,
+                    left: serviceRect.left,
+                    width: serviceRect.width,
+                    maxHeight: "260px",
+                  }}
+                >
                   <div className="p-2 border-b border-gray-100">
                     <div className="relative">
                       <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -212,7 +256,7 @@ export default function FormHeaderSection({
                       />
                     </div>
                   </div>
-                  <div className="overflow-y-auto max-h-48">
+                  <div className="overflow-y-auto" style={{ maxHeight: "200px" }}>
                     {filteredServices.length === 0 ? (
                       <p className="p-3 text-sm text-gray-400 text-center">Aucun résultat</p>
                     ) : (
@@ -237,7 +281,7 @@ export default function FormHeaderSection({
                   </div>
                 </div>
               )}
-              {serviceOpen && <div className="fixed inset-0 z-40" onClick={() => { setServiceOpen(false); setServiceSearch("") }} />}
+              {serviceOpen && <div className="fixed inset-0 z-[9998]" onClick={() => { setServiceOpen(false); setServiceSearch("") }} />}
             </div>
             {errors.serviceDeclarant && (
               <p className="text-xs text-red-500 mt-1">{String(errors.serviceDeclarant.message)}</p>

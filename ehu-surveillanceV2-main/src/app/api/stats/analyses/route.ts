@@ -7,14 +7,46 @@ export async function GET(req: Request) {
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const maladieId = searchParams.get("maladieId") ?? ""
   const days = parseInt(searchParams.get("days") ?? "90")
+  const dateDebut = searchParams.get("dateDebut") ?? ""
+  const dateFin = searchParams.get("dateFin") ?? ""
 
-  const since = new Date()
-  since.setDate(since.getDate() - days)
+  // Multi-maladie (new) — fallback to single maladieId for backward compat
+  const maladieIdsParam = searchParams.get("maladieIds") ?? ""
+  const maladieIds = maladieIdsParam ? maladieIdsParam.split(",").filter(Boolean) : []
+  const maladieIdSingle = searchParams.get("maladieId") ?? ""
 
-  const where: Record<string, unknown> = { createdAt: { gte: since } }
-  if (maladieId) where.maladieId = maladieId
+  const communeId = searchParams.get("communeId") ?? ""
+  const wilayadIdsParam = searchParams.get("wilayadIds") ?? ""
+  const wilayadIds = wilayadIdsParam ? wilayadIdsParam.split(",").filter(Boolean) : []
+
+  const where: Record<string, unknown> = {}
+
+  // Date range — custom dates take priority over period preset
+  if (dateDebut || dateFin) {
+    where.createdAt = {
+      ...(dateDebut ? { gte: new Date(dateDebut) } : {}),
+      ...(dateFin ? { lte: new Date(dateFin + "T23:59:59.999Z") } : {}),
+    }
+  } else {
+    const since = new Date()
+    since.setDate(since.getDate() - days)
+    where.createdAt = { gte: since }
+  }
+
+  // Maladie filter
+  if (maladieIds.length > 0) {
+    where.maladieId = { in: maladieIds }
+  } else if (maladieIdSingle) {
+    where.maladieId = maladieIdSingle
+  }
+
+  // Geo filter — commune takes priority over wilaya
+  if (communeId) {
+    where.communeId = communeId
+  } else if (wilayadIds.length > 0) {
+    where.commune = { wilayadId: { in: wilayadIds } }
+  }
 
   // Cases by disease (prevalence)
   const byMaladie = await prisma.casDeclare.groupBy({
@@ -23,10 +55,13 @@ export async function GET(req: Request) {
     _count: { id: true },
     orderBy: { _count: { id: "desc" } },
   })
-  const maladieIds = byMaladie.map(r => r.maladieId).filter((id): id is string => Boolean(id))
-  const maladies = await prisma.maladie.findMany({ where: { id: { in: maladieIds } } })
+  const maladieFetchIds = byMaladie.map(r => r.maladieId).filter((id): id is string => Boolean(id))
+  const maladies = await prisma.maladie.findMany({ where: { id: { in: maladieFetchIds } } })
   const maladieMap = Object.fromEntries(maladies.map(m => [m.id, m.nom]))
-  const prevalence = byMaladie.map(r => ({ name: r.maladieId ? (maladieMap[r.maladieId] ?? "Inconnu") : "Non renseigné", count: r._count.id }))
+  const prevalence = byMaladie.map(r => ({
+    name: r.maladieId ? (maladieMap[r.maladieId] ?? "Inconnu") : "Non renseigné",
+    count: r._count.id,
+  }))
 
   // Cases by status
   const byStatut = await prisma.casDeclare.groupBy({
@@ -36,10 +71,14 @@ export async function GET(req: Request) {
   })
   const statutDistribution = byStatut.map(r => ({ name: r.statut, count: r._count.id }))
 
-  // Cases by age group (using patient dateOfBirth)
+  // Cases with patient data for age/sex breakdown and trend
   const allCas = await prisma.casDeclare.findMany({
     where,
-    include: { patient: { select: { dateOfBirth: true, sex: true } } },
+    select: {
+      createdAt: true,
+      statut: true,
+      patient: { select: { dateOfBirth: true, sex: true } },
+    },
   })
 
   const ageGroups: Record<string, number> = { "0-14": 0, "15-29": 0, "30-44": 0, "45-59": 0, "60+": 0 }
@@ -56,11 +95,17 @@ export async function GET(req: Request) {
   })
 
   const ageDistribution = Object.entries(ageGroups).map(([name, count]) => ({ name, count }))
-  const sexDistribution = Object.entries(bySex).map(([name, count]) => ({ name: name === "homme" ? "Homme" : "Femme", count }))
+  const sexDistribution = Object.entries(bySex).map(([name, count]) => ({
+    name: name === "homme" ? "Homme" : "Femme",
+    count,
+  }))
 
   // Temporal trend (weekly)
+  const periodDays = dateDebut || dateFin
+    ? Math.max(7, Math.ceil((new Date(dateFin || today).getTime() - new Date(dateDebut || today).getTime()) / (1000 * 60 * 60 * 24)) + 1)
+    : days
   const weeks: Record<string, number> = {}
-  for (let i = Math.ceil(days / 7) - 1; i >= 0; i--) {
+  for (let i = Math.ceil(periodDays / 7) - 1; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i * 7)
     const key = `S${d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`
@@ -76,7 +121,6 @@ export async function GET(req: Request) {
   })
   const weeklyTrend = Object.entries(weeks).map(([date, count]) => ({ date, count }))
 
-  // Summary totals
   const total = allCas.length
   const confirmes = allCas.filter(c => c.statut === "confirme").length
   const tauxConfirmation = total > 0 ? Math.round((confirmes / total) * 100) : 0
@@ -87,7 +131,6 @@ export async function GET(req: Request) {
     ageDistribution,
     sexDistribution,
     weeklyTrend,
-    summary: { total, confirmes, tauxConfirmation, maladiesActives: maladieIds.length },
+    summary: { total, confirmes, tauxConfirmation, maladiesActives: maladieFetchIds.length },
   })
 }
-

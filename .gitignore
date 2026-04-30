@@ -1,0 +1,25 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js build output
+.next/
+out/
+
+# env files — never commit secrets
+.env
+.env.local
+.env.*.local
+*.env.vercel
+
+# vercel
+.vercel/
+
+# typescript build info
+*.tsbuildinfo
+tsconfig.tsbuildinfo
+
+# misc
+.DS_Store
+Thumbs.db

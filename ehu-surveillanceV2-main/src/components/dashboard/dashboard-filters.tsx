@@ -4,12 +4,16 @@ import { useState, useRef, useEffect } from "react"
 import { Search, ChevronDown, X } from "lucide-react"
 import { cn } from "@/utils/cn"
 
+
+
 interface Maladie { id: string; nom: string }
 interface Commune { id: string; nom: string; wilayadId?: string }
 interface Wilaya { id: string; nom: string; code: string }
 
 export interface DashboardFiltersState {
   days: string
+  dateDebut: string
+  dateFin: string
   maladieIds: string[]
   wilayadIds: string[]
   communeId: string
@@ -172,9 +176,9 @@ export default function DashboardFilters({ maladies, communes, wilayas, filters,
           <button
             key={opt.value}
             type="button"
-            onClick={() => onChange({ ...filters, days: opt.value })}
+            onClick={() => onChange({ ...filters, days: opt.value, dateDebut: "", dateFin: "" })}
             className={`px-3 h-[30px] text-[11px] font-semibold transition-all border-r border-gray-200 last:border-r-0 ${
-              filters.days === opt.value
+              filters.days === opt.value && !filters.dateDebut && !filters.dateFin
                 ? "bg-[#1B4F8A] text-white"
                 : "bg-white text-gray-500 hover:bg-gray-50"
             }`}
@@ -182,6 +186,41 @@ export default function DashboardFilters({ maladies, communes, wilayas, filters,
             {opt.label}
           </button>
         ))}
+      </div>
+
+      {/* Custom date range */}
+      <div className="flex items-center gap-1">
+        <input
+          type="date"
+          value={filters.dateDebut}
+          onChange={e => onChange({ ...filters, dateDebut: e.target.value })}
+          className={cn(
+            "input h-[30px] text-[11px] font-medium w-32",
+            (filters.dateDebut || filters.dateFin) && "border-[#1B4F8A]"
+          )}
+          title="Date début"
+        />
+        <span className="text-gray-400 text-xs">→</span>
+        <input
+          type="date"
+          value={filters.dateFin}
+          onChange={e => onChange({ ...filters, dateFin: e.target.value })}
+          className={cn(
+            "input h-[30px] text-[11px] font-medium w-32",
+            (filters.dateDebut || filters.dateFin) && "border-[#1B4F8A]"
+          )}
+          title="Date fin"
+        />
+        {(filters.dateDebut || filters.dateFin) && (
+          <button
+            type="button"
+            onClick={() => onChange({ ...filters, dateDebut: "", dateFin: "" })}
+            className="text-gray-400 hover:text-gray-600"
+            title="Réinitialiser dates"
+          >
+            <X size={12} />
+          </button>
+        )}
       </div>
 
       {/* Wilayas multi-select */}

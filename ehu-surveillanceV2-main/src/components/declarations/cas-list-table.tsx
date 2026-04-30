@@ -32,16 +32,12 @@ interface CasResponse {
   totalPages: number
 }
 
-const STATUTS = ["", "brouillon", "nouveau", "en_cours", "confirme", "suspect", "infirme", "cloture"]
+const STATUTS = ["", "confirme", "suspect", "brouillon"]
 const STATUT_LABELS: Record<string, string> = {
   "": "Tous",
-  brouillon: "Brouillons",
-  nouveau: "Nouveau",
-  en_cours: "En cours",
   confirme: "Confirmé",
   suspect: "Suspect",
-  infirme: "Infirmé",
-  cloture: "Clôturé",
+  brouillon: "Brouillons",
 }
 
 // Searchable service dropdown

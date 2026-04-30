@@ -42,6 +42,8 @@ interface Props {
 export default function DashboardClient({ maladies, communes, wilayas, userName }: Props) {
   const [filters, setFilters] = useState<DashboardFiltersState>({
     days: "30",
+    dateDebut: "",
+    dateFin: "",
     maladieIds: [],
     wilayadIds: [],
     communeId: "",
@@ -55,6 +57,8 @@ export default function DashboardClient({ maladies, communes, wilayas, userName 
     setError(false)
     try {
       const params = new URLSearchParams({ days: filters.days })
+      if (filters.dateDebut) params.set("dateDebut", filters.dateDebut)
+      if (filters.dateFin) params.set("dateFin", filters.dateFin)
       if (filters.communeId) params.set("communeId", filters.communeId)
       if (filters.maladieIds.length > 0) params.set("maladieIds", filters.maladieIds.join(","))
       if (filters.wilayadIds.length > 0) params.set("wilayadIds", filters.wilayadIds.join(","))

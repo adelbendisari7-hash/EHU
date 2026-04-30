@@ -9,6 +9,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const communeId = searchParams.get("communeId") ?? ""
   const days = parseInt(searchParams.get("days") ?? "30")
+  const dateDebut = searchParams.get("dateDebut") ?? ""
+  const dateFin = searchParams.get("dateFin") ?? ""
   // Multi-select support: comma-separated IDs
   const maladieIds = (searchParams.get("maladieIds") ?? "").split(",").filter(Boolean)
   const wilayadIds = (searchParams.get("wilayadIds") ?? "").split(",").filter(Boolean)
@@ -19,7 +21,14 @@ export async function GET(req: Request) {
   const since = new Date()
   since.setDate(since.getDate() - days)
 
-  const where: Record<string, unknown> = { createdAt: { gte: since } }
+  const dateFilter = (dateDebut || dateFin)
+    ? {
+        ...(dateDebut ? { gte: new Date(dateDebut) } : {}),
+        ...(dateFin ? { lte: new Date(dateFin + "T23:59:59.999Z") } : {}),
+      }
+    : { gte: since }
+
+  const where: Record<string, unknown> = { createdAt: dateFilter }
   if (maladieIds.length === 1) where.maladieId = maladieIds[0]
   else if (maladieIds.length > 1) where.maladieId = { in: maladieIds }
   if (communeId) where.communeId = communeId
@@ -69,10 +78,13 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "asc" },
   })
 
-  // Build day buckets
+  // Build day buckets — adapt to custom date range if provided
+  const bucketStart = dateDebut ? new Date(dateDebut) : since
+  const bucketEnd = dateFin ? new Date(dateFin) : new Date()
+  const bucketDays = Math.max(1, Math.ceil((bucketEnd.getTime() - bucketStart.getTime()) / (1000 * 60 * 60 * 24)) + 1)
   const dayMap: Record<string, number> = {}
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date()
+  for (let i = bucketDays - 1; i >= 0; i--) {
+    const d = new Date(bucketEnd)
     d.setDate(d.getDate() - i)
     const key = d.toISOString().slice(0, 10)
     dayMap[key] = 0

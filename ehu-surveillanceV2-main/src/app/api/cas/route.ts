@@ -21,9 +21,9 @@ export async function GET(req: Request) {
   if (service) where.service = { contains: service }
   if (search) {
     where.OR = [
-      { patient: { firstName: { contains: search } } },
-      { patient: { lastName: { contains: search } } },
-      { codeCas: { contains: search } },
+      { patient: { firstName: { contains: search, mode: "insensitive" } } },
+      { patient: { lastName: { contains: search, mode: "insensitive" } } },
+      { codeCas: { contains: search, mode: "insensitive" } },
     ]
   }
   // Médecin can only see their own cases
