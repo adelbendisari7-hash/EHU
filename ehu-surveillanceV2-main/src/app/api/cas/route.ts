@@ -18,7 +18,7 @@ export async function GET(req: Request) {
   const where: Record<string, unknown> = {}
   if (statut) where.statut = statut
   if (maladieId) where.maladieId = maladieId
-  if (service) where.service = { contains: service }
+  if (service) where.serviceDeclarant = { contains: service, mode: "insensitive" }
   if (search) {
     where.OR = [
       { patient: { firstName: { contains: search, mode: "insensitive" } } },

@@ -15,7 +15,8 @@ interface Cas {
   id: string
   codeCas: string
   statut: CasStatut
-  service: string
+  service: string | null
+  serviceDeclarant: string | null
   observation: string | null
   createdAt: string
   patient: { firstName: string; lastName: string }
@@ -230,7 +231,7 @@ export default function CasListTable({ userRole }: { userRole: string }) {
                   <td className="text-mono text-[12px] text-gray-500">{cas.codeCas}</td>
                   <td className="font-medium text-gray-800">{cas.patient.firstName} {cas.patient.lastName}</td>
                   <td className="text-gray-600">{cas.maladie?.nom ?? <span className="text-gray-300">—</span>}</td>
-                  <td className="text-gray-500">{cas.service ?? "—"}</td>
+                  <td className="text-gray-500">{cas.serviceDeclarant ?? cas.service ?? "—"}</td>
                   <td className="text-gray-500">{cas.commune?.nom ?? "—"}</td>
                   <td className="text-gray-500 text-mono text-[12px]">{formatDate(cas.createdAt)}</td>
                   <td><CasStatusBadge statut={cas.statut} /></td>
