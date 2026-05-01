@@ -11,12 +11,24 @@ export async function GET(_req: Request, { params }: { params: Promise<{ casId: 
   const cas = await prisma.casDeclare.findUnique({
     where: { id: casId },
     include: {
-      patient: { include: { commune: true } },
+      patient: { include: { commune: { include: { wilaya: true } } } },
       maladie: true,
       commune: true,
       etablissement: true,
+      medecinDeclarant: true,
       medecin: { select: { id: true, firstName: true, lastName: true, email: true } },
       fichiers: true,
+      symptomes: { include: { symptome: true } },
+      lieux: { orderBy: { ordre: "asc" } },
+      resultatsLabo: { orderBy: { createdAt: "desc" } },
+      casSimilaireRef: {
+        select: {
+          id: true,
+          codeCas: true,
+          patient: { select: { firstName: true, lastName: true } },
+          maladie: { select: { nom: true, codeCim10: true } },
+        },
+      },
       investigation: {
         include: { contacts: true, epidemiologiste: { select: { firstName: true, lastName: true } } },
       },
@@ -121,9 +133,63 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ casId:
         ...(medecinDeclarantId !== null && { medecinDeclarantId }),
         ...(body.etablissementId !== undefined && { etablissementId: body.etablissementId || null }),
         ...(body.communeId !== undefined && { communeId: body.communeId || null }),
+        ...(body.ficheSpecifiqueType !== undefined && { ficheSpecifiqueType: body.ficheSpecifiqueType || null }),
+        ...(body.donneesSpecifiques !== undefined && { donneesSpecifiques: body.donneesSpecifiques ?? null }),
       },
       include: { patient: true, maladie: true },
     })
+
+    // Update symptomes (delete + recreate)
+    if (Array.isArray(body.symptomeIds)) {
+      await prisma.casSymptome.deleteMany({ where: { casId } })
+      if (body.symptomeIds.length > 0) {
+        await prisma.casSymptome.createMany({
+          data: (body.symptomeIds as string[]).map((symptomeId) => ({ casId, symptomeId })),
+          skipDuplicates: true,
+        })
+      }
+    }
+
+    // Update lieux (delete + recreate)
+    if (Array.isArray(body.lieux)) {
+      await prisma.casLieu.deleteMany({ where: { casId } })
+      const lieuxToCreate = (body.lieux as { nom: string; type?: string; adresse?: string; communeId?: string; dateDebut?: string; dateFin?: string }[]).filter(l => l.nom?.trim())
+      if (lieuxToCreate.length > 0) {
+        await prisma.casLieu.createMany({
+          data: lieuxToCreate.slice(0, 4).map((l, idx) => ({
+            casId,
+            ordre: idx + 1,
+            nom: l.nom,
+            type: l.type || null,
+            adresse: l.adresse || null,
+            communeId: l.communeId || null,
+            dateDebut: l.dateDebut ? new Date(l.dateDebut) : null,
+            dateFin: l.dateFin ? new Date(l.dateFin) : null,
+          })),
+        })
+      }
+    }
+
+    // Update resultatsLabo (delete + recreate)
+    if (Array.isArray(body.resultatsLabo)) {
+      await prisma.resultatLabo.deleteMany({ where: { casId } })
+      const resultatsToCreate = (body.resultatsLabo as { typePrelevement: string; datePrelevement: string; germeId?: string; resultat?: string; antibiogramme?: string; laboratoire?: string; notes?: string }[]).filter(r => r.typePrelevement && r.datePrelevement)
+      if (resultatsToCreate.length > 0) {
+        await prisma.resultatLabo.createMany({
+          data: resultatsToCreate.map(r => ({
+            casId,
+            typePrelevement: r.typePrelevement,
+            datePrelevement: new Date(r.datePrelevement),
+            germeId: r.germeId || null,
+            resultat: r.resultat || null,
+            antibiogramme: r.antibiogramme || null,
+            laboratoire: r.laboratoire || null,
+            notes: r.notes || null,
+          })),
+        })
+      }
+    }
+
     return NextResponse.json(cas)
   } catch (err) {
     console.error("PATCH /api/cas error:", err)

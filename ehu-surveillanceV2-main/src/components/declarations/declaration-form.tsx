@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 import { cn } from "@/utils/cn"
 import ProtocoleAlertModal from "@/components/protocoles/protocole-alert-modal"
 import OcrScanner from "@/components/declarations/ocr-scanner"
@@ -166,6 +167,11 @@ interface ResultatLaboEntry {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+function toDateStr(val: string | null | undefined): string {
+  if (!val) return ""
+  try { return new Date(val).toISOString().slice(0, 10) } catch { return "" }
+}
+
 function calculateAgeDetailed(dateString: string): { ans: number; mois: number; jours: number } | null {
   try {
     const dob = new Date(dateString)
@@ -267,8 +273,9 @@ function SearchableSelect({
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
-export default function DeclarationForm() {
+export default function DeclarationForm({ casId }: { casId?: string } = {}) {
   const router = useRouter()
+  const isEditMode = !!casId
 
   // Data state
   const [maladies, setMaladies] = useState<Maladie[]>([])
@@ -287,6 +294,7 @@ export default function DeclarationForm() {
   // UI state
   const [loading, setLoading] = useState(false)
   const [brouillonLoading, setBrouillonLoading] = useState(false)
+  const [initialLoading, setInitialLoading] = useState(isEditMode)
   const [error, setError] = useState<string | null>(null)
   const [pendingCasId, setPendingCasId] = useState<string | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -306,6 +314,8 @@ export default function DeclarationForm() {
   // Prevent circular DOB <-> age updates
   const ageChangedByUser = useRef(false)
   const dobChangedByUser = useRef(false)
+  // Prevent wilayadId effect from clearing communeId during initial edit load
+  const skipCommuneReset = useRef(false)
 
   // Form
   const {
@@ -315,6 +325,7 @@ export default function DeclarationForm() {
     setValue,
     control,
     getValues,
+    reset,
     formState: { errors },
   } = useForm<DeclarationFormData>({
     resolver: zodResolver(declarationSchema),
@@ -369,9 +380,7 @@ export default function DeclarationForm() {
     if (ageAns !== undefined && ageAns !== null && !isNaN(ageAns as number)) {
       ageChangedByUser.current = true
       const year = new Date().getFullYear() - (ageAns as number)
-      // June 30 as default birthday when only age is known
-      const dobStr = `${year}-06-30`
-      setValue("dateOfBirth", dobStr)
+      setValue("dateOfBirth", `${year}-06-30`)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ageAns, setValue])
@@ -379,13 +388,19 @@ export default function DeclarationForm() {
   useEffect(() => {
     if (wilayadId) {
       setFilteredCommunes(allCommunes.filter(c => c.wilayadId === wilayadId))
-      setValue("communeId", "")
+      if (!skipCommuneReset.current) {
+        setValue("communeId", "")
+      }
+      skipCommuneReset.current = false
     } else {
       setFilteredCommunes(allCommunes)
     }
   }, [wilayadId, allCommunes, setValue])
 
+  // Load reference data — create mode only
   useEffect(() => {
+    if (isEditMode) return
+
     fetch("/api/maladies")
       .then(r => r.json())
       .then(data => {
@@ -424,7 +439,151 @@ export default function DeclarationForm() {
       .then(r => r.json())
       .then(setGermes)
       .catch(console.error)
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode])
+
+  // Load reference data + case data — edit mode only
+  useEffect(() => {
+    if (!casId) return
+
+    Promise.all([
+      fetch("/api/maladies").then(r => r.json()),
+      fetch("/api/communes").then(r => r.json()),
+      fetch("/api/etablissements").then(r => r.json()),
+      fetch("/api/symptomes").then(r => r.json()),
+      fetch("/api/germes").then(r => r.json()),
+      fetch(`/api/cas/${casId}`).then(r => r.json()),
+    ]).then(([maladiesData, communesData, etabData, sympData, germeData, caseData]) => {
+      setMaladies(maladiesData.maladies)
+      setGroupedMaladies(maladiesData.grouped)
+      setAllCommunes(communesData)
+      setEtablissements(etabData)
+      setSymptomes(sympData)
+      setGermes(germeData)
+
+      const wilayadMap = new Map<string, Wilaya>()
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      communesData.forEach((c: any) => {
+        if (c.wilaya && !wilayadMap.has(c.wilaya.id)) {
+          wilayadMap.set(c.wilaya.id, { id: c.wilaya.id, nom: c.wilaya.nom, code: c.wilaya.code ?? "" })
+        }
+      })
+      setWilayas(Array.from(wilayadMap.values()).sort((a, b) => a.nom.localeCompare(b.nom)))
+
+      const p = caseData.patient
+      const md = caseData.medecinDeclarant
+
+      // Find wilayadId from the patient's commune
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const commune = communesData.find((c: any) => c.id === p?.communeId)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const resolvedWilayadId: string = commune?.wilaya?.id ?? (commune as any)?.wilayadId ?? ""
+
+      // Pre-filter communes and prevent the effect from clearing communeId
+      if (resolvedWilayadId) {
+        skipCommuneReset.current = true
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setFilteredCommunes(communesData.filter((c: any) => c.wilayadId === resolvedWilayadId || c.wilaya?.id === resolvedWilayadId))
+      }
+
+      // Pre-fill form with case data
+      reset({
+        medecinDeclarantId: md?.id ?? "",
+        nomMedecinDeclarant: md?.nom ?? "",
+        prenomMedecinDeclarant: md?.prenom ?? "",
+        serviceDeclarant: caseData.serviceDeclarant ?? "",
+        firstName: p?.firstName ?? "",
+        lastName: p?.lastName ?? "",
+        nin: caseData.nin ?? "",
+        dateOfBirth: toDateStr(p?.dateOfBirth),
+        ageAns: caseData.ageAns !== null && caseData.ageAns !== undefined ? Number(caseData.ageAns) : undefined,
+        ageMois: caseData.ageMois !== null && caseData.ageMois !== undefined ? Number(caseData.ageMois) : undefined,
+        ageJours: caseData.ageJours !== null && caseData.ageJours !== undefined ? Number(caseData.ageJours) : undefined,
+        sex: p?.sex ?? "homme",
+        address: p?.address ?? "",
+        wilayadId: resolvedWilayadId,
+        communeId: p?.communeId ?? "",
+        phone: p?.phone ?? "",
+        emailPatient: caseData.emailPatient ?? "",
+        profession: caseData.profession ?? "",
+        lieuTravail: caseData.lieuTravail ?? "",
+        estEtranger: caseData.estEtranger ?? false,
+        nationalite: caseData.nationalite ?? "",
+        nationaliteCode: caseData.nationaliteCode ?? "",
+        maladieId: caseData.maladieId ?? "",
+        dateDebutSymptomes: toDateStr(caseData.dateDebutSymptomes),
+        dateDiagnostic: toDateStr(caseData.dateDiagnostic),
+        symptomesTexte: caseData.symptomesTexte ?? "",
+        observation: caseData.observation ?? undefined,
+        modeConfirmation: caseData.modeConfirmation ?? undefined,
+        atcd: caseData.atcd ?? "",
+        casSimilaire: caseData.casSimilaire ?? false,
+        casSimilaireId: caseData.casSimilaireId ?? "",
+        estHospitalise: caseData.estHospitalise ?? false,
+        dateHospitalisation: toDateStr(caseData.dateHospitalisation),
+        structureHospitalisationId: caseData.structureHospitalisationId ?? "",
+        serviceHospitalisation: caseData.serviceHospitalisation ?? "",
+        estEvacue: caseData.estEvacue ?? false,
+        dateEvacuation: toDateStr(caseData.dateEvacuation),
+        structureEvacuation: caseData.structureEvacuation ?? "",
+        evolution: caseData.evolution ?? undefined,
+        dateSortie: toDateStr(caseData.dateSortie),
+        dateDeces: toDateStr(caseData.dateDeces),
+        service: caseData.service ?? "",
+        notesCliniques: caseData.notesCliniques ?? "",
+        resultatLabo: caseData.resultatLabo ?? "",
+        etablissementId: caseData.etablissementId ?? "",
+      })
+
+      // Pre-fill symptomes
+      if (Array.isArray(caseData.symptomes)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setSelectedSymptomeIds(caseData.symptomes.map((s: any) => s.symptomeId))
+      }
+
+      // Pre-fill lieux
+      if (Array.isArray(caseData.lieux)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setLieux(caseData.lieux.map((l: any) => ({
+          nom: l.nom ?? "", type: l.type ?? "", adresse: l.adresse ?? "",
+          communeId: l.communeId ?? "", dateDebut: toDateStr(l.dateDebut), dateFin: toDateStr(l.dateFin),
+        })))
+      }
+
+      // Pre-fill resultatsLabo
+      if (Array.isArray(caseData.resultatsLabo)) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setResultatsLabo(caseData.resultatsLabo.map((r: any) => ({
+          typePrelevement: r.typePrelevement ?? "", datePrelevement: toDateStr(r.datePrelevement),
+          germeId: r.germeId ?? "", resultat: r.resultat ?? "",
+          antibiogramme: r.antibiogramme ?? "", laboratoire: r.laboratoire ?? "", notes: r.notes ?? "",
+        })))
+      }
+
+      // Pre-fill ficheSpecifique
+      if (caseData.ficheSpecifiqueType) {
+        setFicheSpecifiqueSlug(caseData.ficheSpecifiqueType)
+      }
+
+      // Pre-fill cas similaire reference
+      if (caseData.casSimilaireRef) {
+        setSelectedCasSimilaire({
+          id: caseData.casSimilaireRef.id,
+          codeCas: caseData.casSimilaireRef.codeCas,
+          statut: "",
+          createdAt: "",
+          maladie: caseData.casSimilaireRef.maladie ?? { nom: "", codeCim10: "" },
+          patient: caseData.casSimilaireRef.patient ?? { firstName: "", lastName: "" },
+        })
+      }
+
+      setInitialLoading(false)
+    }).catch(err => {
+      console.error("Edit mode load error:", err)
+      setInitialLoading(false)
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [casId])
 
   useEffect(() => {
     if (maladieId) {
@@ -465,6 +624,7 @@ export default function DeclarationForm() {
       communeId: data.communeId || null,
       phone: data.phone || null,
     },
+    communeId: data.communeId || null,
     maladieId: data.maladieId,
     dateDebutSymptomes: data.dateDebutSymptomes || null,
     dateDiagnostic: data.dateDiagnostic || null,
@@ -506,7 +666,6 @@ export default function DeclarationForm() {
     symptomeIds: selectedSymptomeIds,
     lieux: lieux.filter(l => l.nom.trim()),
     resultatsLabo: resultatsLabo.filter(r => r.typePrelevement && r.datePrelevement),
-    // Doctor fields
     nomMedecinDeclarant: data.nomMedecinDeclarant || null,
     prenomMedecinDeclarant: data.prenomMedecinDeclarant || null,
     medecinDeclarantId: data.medecinDeclarantId || null,
@@ -514,38 +673,48 @@ export default function DeclarationForm() {
   })
 
   // ---------------------------------------------------------------------------
-  // Submit — Validate & confirm
+  // Submit — handles both create (POST) and update (PATCH)
   // ---------------------------------------------------------------------------
   const onSubmit = async (data: DeclarationFormData) => {
     setLoading(true)
     setError(null)
     try {
-      // Derive statut from observation
       let statut = "nouveau"
       if (data.observation === "cas_confirme") statut = "confirme"
       else if (data.observation === "cas_suspect") statut = "suspect"
 
       const payload = buildPayload(data, statut)
 
-      const res = await fetch("/api/cas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      })
-
-      if (!res.ok) {
-        const err = await res.json()
-        throw new Error(err.error ?? "Erreur lors de la déclaration")
-      }
-
-      const cas = await res.json()
-      toast.success("Déclaration enregistrée avec succès")
-
-      if (cas.declenchement) {
-        setDeclenchement(cas.declenchement)
-        setPendingCasId(cas.id)
+      if (isEditMode) {
+        const res = await fetch(`/api/cas/${casId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error ?? "Erreur lors de la mise à jour")
+        }
+        toast.success("Déclaration mise à jour")
+        router.push(`/declarations/${casId}`)
       } else {
-        router.push(`/declarations/${cas.id}`)
+        const res = await fetch("/api/cas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+        if (!res.ok) {
+          const err = await res.json()
+          throw new Error(err.error ?? "Erreur lors de la déclaration")
+        }
+        const cas = await res.json()
+        toast.success("Déclaration enregistrée avec succès")
+        if (cas.declenchement) {
+          setDeclenchement(cas.declenchement)
+          setPendingCasId(cas.id)
+        } else {
+          router.push(`/declarations/${cas.id}`)
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur inconnue"
@@ -557,14 +726,13 @@ export default function DeclarationForm() {
   }
 
   // ---------------------------------------------------------------------------
-  // Save as brouillon — no full validation
+  // Save as brouillon — create mode only
   // ---------------------------------------------------------------------------
   const saveBrouillon = async () => {
     setBrouillonLoading(true)
     setError(null)
     try {
       const raw = getValues()
-      // Minimal parse
       const parsed = brouillonSchema.safeParse(raw)
       const data = parsed.success ? parsed.data : raw
 
@@ -693,6 +861,17 @@ export default function DeclarationForm() {
   })).filter(g => g.items.length > 0)
 
   // ---------------------------------------------------------------------------
+  // Loading spinner (edit mode while fetching case data)
+  // ---------------------------------------------------------------------------
+  if (initialLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-8 h-8 border-2 border-gray-200 rounded-full animate-spin" style={{ borderTopColor: "#1B4F8A" }} />
+      </div>
+    )
+  }
+
+  // ---------------------------------------------------------------------------
   // Render
   // ---------------------------------------------------------------------------
   return (
@@ -701,7 +880,7 @@ export default function DeclarationForm() {
         <OcrScanner onApply={applyOcrData} onClose={() => setShowScanner(false)} />
       )}
 
-      {declenchement && (
+      {!isEditMode && declenchement && (
         <ProtocoleAlertModal
           declenchement={declenchement}
           maladieName={selectedMaladie?.nom ?? ""}
@@ -1430,29 +1609,53 @@ export default function DeclarationForm() {
 
         {/* Action buttons */}
         <div className="flex gap-3 pb-8">
-          <button
-            type="button"
-            onClick={saveBrouillon}
-            disabled={brouillonLoading}
-            className="btn btn-secondary btn-lg"
-          >
-            {brouillonLoading ? (
-              <><Loader2 size={14} className="animate-spin" /> Enregistrement...</>
-            ) : (
-              <><FileText size={14} /> Enregistrer en tant que brouillon</>
-            )}
-          </button>
-          <button
-            type="submit"
-            disabled={loading}
-            className="btn btn-success btn-lg flex-1"
-          >
-            {loading ? (
-              <><Loader2 size={15} className="animate-spin" /> Enregistrement...</>
-            ) : (
-              <><CheckCircle2 size={15} /> Valider la Déclaration</>
-            )}
-          </button>
+          {isEditMode ? (
+            <>
+              <Link
+                href={`/declarations/${casId}`}
+                className="btn btn-secondary btn-lg"
+              >
+                Annuler
+              </Link>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn btn-success btn-lg flex-1"
+              >
+                {loading ? (
+                  <><Loader2 size={15} className="animate-spin" /> Enregistrement...</>
+                ) : (
+                  <><CheckCircle2 size={15} /> Sauvegarder les Modifications</>
+                )}
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={saveBrouillon}
+                disabled={brouillonLoading}
+                className="btn btn-secondary btn-lg"
+              >
+                {brouillonLoading ? (
+                  <><Loader2 size={14} className="animate-spin" /> Enregistrement...</>
+                ) : (
+                  <><FileText size={14} /> Enregistrer en tant que brouillon</>
+                )}
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="btn btn-success btn-lg flex-1"
+              >
+                {loading ? (
+                  <><Loader2 size={15} className="animate-spin" /> Enregistrement...</>
+                ) : (
+                  <><CheckCircle2 size={15} /> Valider la Déclaration</>
+                )}
+              </button>
+            </>
+          )}
         </div>
       </form>
     </>
