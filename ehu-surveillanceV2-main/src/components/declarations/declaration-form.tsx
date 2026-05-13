@@ -827,7 +827,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     setLoading(true)
     setError(null)
     try {
-      let statut = "nouveau"
+      let statut = "suspect"
       if (data.observation === "cas_confirme") statut = "confirme"
       else if (data.observation === "cas_suspect") statut = "suspect"
 

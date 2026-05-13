@@ -256,7 +256,7 @@ export async function POST(req: Request) {
       const whereCount: Record<string, unknown> = {
         maladieId: body.maladieId,
         createdAt: { gte: since },
-        statut: { not: "infirme" },
+        statut: { not: "brouillon" },
       }
       if (seuil.perimetre === "commune" && seuil.communeId) {
         whereCount.communeId = seuil.communeId

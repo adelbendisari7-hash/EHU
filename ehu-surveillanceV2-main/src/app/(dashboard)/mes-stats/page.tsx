@@ -61,7 +61,7 @@ export default async function MesStatsPage() {
     })
   )
 
-  const casDecedes = casByStatut.find(s => s.statut === "cloture")?._count ?? 0
+  const casDecedes = casByStatut.find(s => s.statut === "confirme")?._count ?? 0
   const cfr = totalCas > 0 ? ((casDecedes / totalCas) * 100).toFixed(1) : "0.0"
 
   return (

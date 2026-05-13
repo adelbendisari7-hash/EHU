@@ -192,7 +192,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ casId:
     }
 
     // Trigger threshold check when case is confirmed or new
-    if (statut && ["confirme", "nouveau", "suspect"].includes(statut) && cas.maladieId) {
+    if (statut && ["confirme", "suspect"].includes(statut) && cas.maladieId) {
       const cId: string | null = typeof body.communeId === "string" ? body.communeId : null
       void checkAndTriggerThresholds(cas.maladieId, cId).catch(() => { /* non-blocking */ })
     }

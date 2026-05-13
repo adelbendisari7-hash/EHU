@@ -36,7 +36,7 @@ export async function GET() {
   const recentCounts = await prisma.casDeclare.groupBy({
     by: ["maladieId"],
     _count: { _all: true },
-    where: { createdAt: { gte: since }, statut: { not: "infirme" } },
+    where: { createdAt: { gte: since }, statut: { not: "brouillon" } },
   })
 
   const recentMap = Object.fromEntries(

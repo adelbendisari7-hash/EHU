@@ -140,8 +140,8 @@ export default function MesStatsClient({ stats }: { stats: Stats }) {
                 </div>
                 <div className="text-right shrink-0">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                    c.statut === "confirme" ? "bg-green-100 text-green-700" :
-                    c.statut === "en_cours" ? "bg-blue-100 text-blue-700" :
+                    c.statut === "confirme" ? "bg-red-100 text-red-700" :
+                    c.statut === "suspect" ? "bg-amber-100 text-amber-700" :
                     "bg-gray-100 text-gray-600"
                   }`}>
                     {STATUT_LABELS[c.statut] ?? c.statut}
