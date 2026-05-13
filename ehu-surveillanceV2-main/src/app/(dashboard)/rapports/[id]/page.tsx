@@ -463,7 +463,7 @@ export default function RapportDetailPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {d.casByMaladie
+              {[...d.casByMaladie]
                 .sort((a: { count: number }, b: { count: number }) => b.count - a.count)
                 .map((row: { maladie: string; count: number }, i: number) => {
                   const total = d.summary?.total ?? 0

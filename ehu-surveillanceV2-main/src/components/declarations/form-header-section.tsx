@@ -25,29 +25,30 @@ export default function FormHeaderSection({
   watch: UseFormWatch<any>
 }) {
   const [medecins, setMedecins] = useState<MedecinDeclarant[]>([])
+  const [medecinsLoaded, setMedecinsLoaded] = useState(false)
   const [query, setQuery] = useState("")
   const [open, setOpen] = useState(false)
   const [serviceOpen, setServiceOpen] = useState(false)
   const [serviceSearch, setServiceSearch] = useState("")
 
-  // Refs for position:fixed dropdown anchoring
   const serviceButtonRef = useRef<HTMLButtonElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
   const [serviceRect, setServiceRect] = useState<DOMRect | null>(null)
   const [searchRect, setSearchRect] = useState<DOMRect | null>(null)
 
-  // Watch only the ID — this is the only reliable signal that a doctor was selected from autocomplete
   const medecinIdVal: string = watch("medecinDeclarantId") ?? ""
   const prenomVal: string = watch("prenomMedecinDeclarant") ?? ""
   const nomVal: string = watch("nomMedecinDeclarant") ?? ""
   const serviceVal: string = watch("serviceDeclarant") ?? ""
 
-  useEffect(() => {
+  const loadMedecins = () => {
+    if (medecinsLoaded) return
+    setMedecinsLoaded(true)
     fetch("/api/medecins-declarants")
       .then(r => r.json())
       .then(setMedecins)
       .catch(() => {})
-  }, [])
+  }
 
   const suggestions = query.length >= 2
     ? medecins.filter(m =>
@@ -69,7 +70,19 @@ export default function FormHeaderSection({
     setOpen(false)
   }
 
-  // Clear autocomplete selection — keep manual fields visible for re-entry
+  // Parse "prenom nom" from query for new doctor creation
+  const queryParts = query.trim().split(/\s+/)
+  const canCreate = queryParts.length >= 2 && queryParts[0].length >= 1 && queryParts[1].length >= 1
+  const createPrenom = queryParts[0] ?? ""
+  const createNom = queryParts.slice(1).join(" ") || ""
+
+  const createMedecin = () => {
+    setValue("medecinDeclarantId", "")
+    setValue("prenomMedecinDeclarant", createPrenom)
+    setValue("nomMedecinDeclarant", createNom)
+    setOpen(false)
+  }
+
   const clearSelection = () => {
     setValue("medecinDeclarantId", "")
     setValue("nomMedecinDeclarant", "")
@@ -94,7 +107,19 @@ export default function FormHeaderSection({
     setServiceOpen(v => !v)
   }
 
+  // Doctor is "confirmed" if picked from DB or created via "Créer"
+  const isDoctorConfirmed = !!(medecinIdVal || (nomVal.length >= 2 && prenomVal.length >= 2))
+  const isNewDoctor = !medecinIdVal && isDoctorConfirmed
+
   const hasErrors = errors.nomMedecinDeclarant || errors.prenomMedecinDeclarant || errors.serviceDeclarant
+
+  // Sync query display when form is pre-filled (edit mode)
+  useEffect(() => {
+    if (prenomVal && nomVal && !query) {
+      setQuery(`${prenomVal} ${nomVal}`)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prenomVal, nomVal])
 
   return (
     <div className="card">
@@ -114,24 +139,33 @@ export default function FormHeaderSection({
               Médecin déclarant <span className="text-red-500">*</span>
             </label>
 
-            {/* If a doctor was selected from the autocomplete list — show tag */}
-            {medecinIdVal ? (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#1B4F8A] bg-[#EBF1FA]">
-                <UserPlus size={14} className="text-[#1B4F8A] shrink-0" />
-                <span className="flex-1 text-sm font-medium text-[#1B4F8A]">
+            {/* Hidden inputs — hold values for form validation & submission */}
+            <input type="hidden" {...register("nomMedecinDeclarant")} />
+            <input type="hidden" {...register("prenomMedecinDeclarant")} />
+
+            {isDoctorConfirmed ? (
+              <div className={cn(
+                "flex items-center gap-2 px-3 py-2 rounded-lg border",
+                isNewDoctor ? "border-amber-300 bg-amber-50" : "border-[#1B4F8A] bg-[#EBF1FA]"
+              )}>
+                <UserPlus size={14} className={cn("shrink-0", isNewDoctor ? "text-amber-600" : "text-[#1B4F8A]")} />
+                <span className={cn("flex-1 text-sm font-medium", isNewDoctor ? "text-amber-800" : "text-[#1B4F8A]")}>
                   Dr {prenomVal} {nomVal}
+                  {isNewDoctor && (
+                    <span className="ml-2 text-[11px] font-normal opacity-70">(sera enregistré)</span>
+                  )}
                 </span>
                 <button
                   type="button"
                   onClick={clearSelection}
-                  className="text-[#1B4F8A] hover:text-blue-900 text-xs underline shrink-0"
+                  className={cn("text-xs underline shrink-0", isNewDoctor ? "text-amber-600 hover:text-amber-800" : "text-[#1B4F8A] hover:text-blue-900")}
                 >
                   Modifier
                 </button>
               </div>
             ) : (
               <>
-                {/* Search box — find an existing doctor */}
+                {/* Search input — only this, no manual nom/prenom fields */}
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   <input
@@ -139,68 +173,60 @@ export default function FormHeaderSection({
                     type="text"
                     value={query}
                     onChange={e => { setQuery(e.target.value); openSearchDropdown() }}
-                    onFocus={openSearchDropdown}
-                    placeholder="Rechercher ou saisir le nom du médecin..."
+                    onFocus={() => { loadMedecins(); openSearchDropdown() }}
+                    placeholder="Rechercher le médecin déclarant..."
                     className={cn("input w-full pl-9", hasErrors && "input-error")}
                   />
                 </div>
 
-                {/* Suggestions — position:fixed bypasses all overflow:hidden */}
+                {/* Suggestions dropdown — position:fixed bypasses overflow:hidden */}
                 {open && query.length >= 2 && searchRect && (
                   <div
-                    className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto"
+                    className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto"
                     style={{ top: searchRect.bottom + 4, left: searchRect.left, width: searchRect.width }}
                   >
-                    {suggestions.length > 0 ? (
-                      <>
-                        {suggestions.map(m => (
-                          <button
-                            key={m.id}
-                            type="button"
-                            onClick={() => selectMedecin(m)}
-                            className="w-full text-left px-3 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0"
-                          >
-                            <p className="text-sm font-medium text-gray-800">Dr {m.prenom} {m.nom}</p>
-                            <p className="text-xs text-gray-400">{m.service}</p>
-                          </button>
-                        ))}
-                        <div className="px-3 py-2 border-t border-gray-100 bg-gray-50">
-                          <p className="text-[11px] text-gray-400">Ou saisissez les informations ci-dessous pour un nouveau médecin</p>
+                    {suggestions.map(m => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => selectMedecin(m)}
+                        className="w-full text-left px-3 py-2.5 hover:bg-gray-50 border-b border-gray-50 last:border-0"
+                      >
+                        <p className="text-sm font-medium text-gray-800">Dr {m.prenom} {m.nom}</p>
+                        <p className="text-xs text-gray-400">{m.service}</p>
+                      </button>
+                    ))}
+
+                    {/* Create new doctor option */}
+                    {canCreate && (
+                      <button
+                        type="button"
+                        onClick={createMedecin}
+                        className="w-full text-left px-3 py-2.5 bg-blue-50 hover:bg-blue-100 border-t border-blue-100"
+                      >
+                        <div className="flex items-center gap-2">
+                          <UserPlus size={13} className="text-blue-600 shrink-0" />
+                          <div>
+                            <p className="text-sm font-medium text-blue-700">Créer : Dr {createPrenom} {createNom}</p>
+                            <p className="text-[11px] text-blue-500">Ce médecin sera enregistré à la soumission</p>
+                          </div>
                         </div>
-                      </>
-                    ) : (
-                      <div className="px-3 py-2.5 bg-amber-50">
-                        <p className="text-xs text-amber-700">Médecin non trouvé — remplissez nom, prénom et service ci-dessous</p>
+                      </button>
+                    )}
+
+                    {suggestions.length === 0 && !canCreate && (
+                      <div className="px-3 py-2.5 text-center">
+                        <p className="text-xs text-gray-400">Saisissez prénom et nom (ex: Ahmed Benali) pour créer</p>
                       </div>
                     )}
                   </div>
                 )}
                 {open && <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />}
-
-                {/* Manual entry — ALWAYS visible when no doctor selected from autocomplete */}
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div>
-                    <input
-                      {...register("prenomMedecinDeclarant")}
-                      placeholder="Prénom *"
-                      className={cn("input w-full text-sm", errors.prenomMedecinDeclarant && "input-error")}
-                    />
-                    {errors.prenomMedecinDeclarant && (
-                      <p className="text-xs text-red-500 mt-1">{String(errors.prenomMedecinDeclarant.message)}</p>
-                    )}
-                  </div>
-                  <div>
-                    <input
-                      {...register("nomMedecinDeclarant")}
-                      placeholder="Nom *"
-                      className={cn("input w-full text-sm", errors.nomMedecinDeclarant && "input-error")}
-                    />
-                    {errors.nomMedecinDeclarant && (
-                      <p className="text-xs text-red-500 mt-1">{String(errors.nomMedecinDeclarant.message)}</p>
-                    )}
-                  </div>
-                </div>
               </>
+            )}
+
+            {hasErrors && (
+              <p className="text-xs text-red-500 mt-1">Médecin déclarant requis</p>
             )}
           </div>
 
@@ -225,7 +251,6 @@ export default function FormHeaderSection({
                 <ChevronDown size={14} className="text-gray-400 shrink-0 ml-2" />
               </button>
 
-              {/* Service dropdown — position:fixed bypasses all overflow:hidden */}
               {serviceOpen && serviceRect && (
                 <div
                   className="fixed z-[9999] bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
@@ -274,6 +299,12 @@ export default function FormHeaderSection({
             {errors.serviceDeclarant && (
               <p className="text-xs text-red-500 mt-1">{String(errors.serviceDeclarant.message)}</p>
             )}
+          </div>
+
+          {/* ── Date de déclaration ─────────────────────────────────────── */}
+          <div>
+            <label className="label">Date de déclaration</label>
+            <input {...register("dateDeclaration")} type="date" className="input w-full" />
           </div>
 
         </div>

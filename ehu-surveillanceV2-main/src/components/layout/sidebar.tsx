@@ -6,7 +6,7 @@ import Link from "next/link"
 import {
   LayoutDashboard, FilePlus, List, Search,
   BarChart, AlertTriangle, Users, Settings, Shield, LogOut, Menu, X, FileBarChart,
-  ChevronRight,
+  ChevronRight, TrendingUp, History, Bell, Activity, LayoutTemplate,
 } from "lucide-react"
 import { cn } from "@/utils/cn"
 import { NAV_ITEMS } from "@/constants/navigation"
@@ -14,16 +14,17 @@ import { signOut } from "next-auth/react"
 
 const ICONS: Record<string, React.ElementType> = {
   LayoutDashboard, FilePlus, List, Search,
-  BarChart, AlertTriangle, Users, Settings, Shield, FileBarChart,
+  BarChart, AlertTriangle, Users, Settings, Shield, FileBarChart, TrendingUp, History, Bell, Activity, LayoutTemplate,
 }
 
 // Group nav items for visual hierarchy
 const NAV_GROUPS: Record<string, string[]> = {
   Principal: ["/dashboard"],
   Déclarations: ["/declarations/new", "/declarations"],
-  Analyse: ["/investigations", "/analyses", "/rapports"],
-  Alertes: ["/alertes", "/alertes/groupes"],
-  Administration: ["/utilisateurs", "/roles", "/parametres"],
+  Analyse: ["/investigations", "/analyses", "/predictions", "/rapports", "/rapports/modeles"],
+  Alertes: ["/alertes"],
+  Administration: ["/utilisateurs", "/roles", "/parametres", "/parametres/historique"],
+  Compte: ["/notifications"],
 }
 
 function NavLinks({
@@ -54,6 +55,25 @@ function NavLinks({
               {groupItems.map((item) => {
                 const Icon = ICONS[item.icon]
                 const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href) && !NAV_ITEMS.some(n => n.href !== item.href && n.href.startsWith(item.href) && pathname.startsWith(n.href)))
+                if (item.isSubItem) {
+                  return (
+                    <li key={item.href} className="pl-4">
+                      <Link
+                        href={item.href}
+                        onClick={onNavigate}
+                        className={cn(
+                          "group flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] transition-all relative border-l border-white/15 ml-1",
+                          isActive
+                            ? "text-white font-medium bg-white/10"
+                            : "text-white/50 hover:bg-white/8 hover:text-white/80"
+                        )}
+                      >
+                        {Icon && <Icon size={13} className="shrink-0" />}
+                        <span className="truncate">{item.label}</span>
+                      </Link>
+                    </li>
+                  )
+                }
                 return (
                   <li key={item.href}>
                     <Link

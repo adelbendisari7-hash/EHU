@@ -1,8 +1,46 @@
 "use client"
 
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts"
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts"
 
 interface DiseaseData { name: string; count: number }
+
+// Custom tick that wraps long names onto two lines
+function CustomTick({ x, y, payload, width }: { x?: number | string; y?: number | string; payload?: { value: string }; width?: number }) {
+  const name: string = payload?.value ?? ""
+  const maxW = (width ?? 160) - 4
+  const words = name.split(" ")
+  const lines: string[] = []
+  let current = ""
+  for (const word of words) {
+    const test = current ? `${current} ${word}` : word
+    if (test.length * 6.5 > maxW && current) {
+      lines.push(current)
+      current = word
+    } else {
+      current = test
+    }
+  }
+  if (current) lines.push(current)
+  const lineH = 13
+  const totalH = lines.length * lineH
+  return (
+    <g transform={`translate(${x},${y})`}>
+      {lines.map((line, i) => (
+        <text
+          key={i}
+          x={-6}
+          y={-totalH / 2 + i * lineH + lineH * 0.75}
+          textAnchor="end"
+          fill="#4B5563"
+          fontSize={11}
+          fontWeight={500}
+        >
+          {line}
+        </text>
+      ))}
+    </g>
+  )
+}
 
 export default function DiseaseDistribution({ data }: { data: DiseaseData[] }) {
   if (!data.length) {
@@ -13,9 +51,14 @@ export default function DiseaseDistribution({ data }: { data: DiseaseData[] }) {
     )
   }
 
+  const maxNameLen = data.reduce((m, d) => Math.max(m, d.name.length), 0)
+  const labelWidth = Math.min(Math.max(Math.ceil(maxNameLen * 6.5), 110), 200)
+  const rowHeight = 44
+  const chartHeight = Math.max(280, data.length * rowHeight)
+
   return (
-    <ResponsiveContainer width="100%" height={280}>
-      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
+    <ResponsiveContainer width="100%" height={chartHeight}>
+      <BarChart data={data} layout="vertical" margin={{ top: 4, right: 20, left: 0, bottom: 4 }}>
         <XAxis
           type="number"
           tick={{ fontSize: 10, fill: "#9CA3AF", fontWeight: 500 }}
@@ -26,28 +69,27 @@ export default function DiseaseDistribution({ data }: { data: DiseaseData[] }) {
         <YAxis
           type="category"
           dataKey="name"
-          tick={{ fontSize: 11, fill: "#4B5563", fontWeight: 500 }}
+          tick={(props) => <CustomTick {...props} width={labelWidth} />}
           tickLine={false}
           axisLine={false}
-          width={110}
+          width={labelWidth}
         />
         <Tooltip
           contentStyle={{
             borderRadius: "8px",
             border: "1px solid #E5E7EB",
             fontSize: "12px",
-            boxShadow: "var(--shadow-md)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
             padding: "8px 12px",
           }}
           formatter={(value) => [value, "Cas"]}
           cursor={{ fill: "rgba(27, 79, 138, 0.04)" }}
         />
-        <Bar
-          dataKey="count"
-          fill="#1B4F8A"
-          radius={[0, 4, 4, 0]}
-          barSize={18}
-        />
+        <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={20}>
+          {data.map((_, i) => (
+            <Cell key={i} fill={i === 0 ? "#1B4F8A" : i === 1 ? "#2563EB" : "#3B82F6"} />
+          ))}
+        </Bar>
       </BarChart>
     </ResponsiveContainer>
   )

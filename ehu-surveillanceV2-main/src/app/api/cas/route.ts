@@ -16,7 +16,16 @@ export async function GET(req: Request) {
   const service = searchParams.get("service") ?? ""
 
   const where: Record<string, unknown> = {}
-  if (statut) where.statut = statut
+  // Use notIn with valid enum values so Prisma doesn't throw on legacy DB statuses
+  if (statut === "suspect") {
+    // Everything that is not brouillon or confirme (covers legacy: nouveau, en_cours, infirme)
+    where.statut = { notIn: ["brouillon", "confirme"] }
+  } else if (statut === "confirme") {
+    // Only confirmed cases; legacy "cloture" rows will be visible after migration
+    where.statut = "confirme"
+  } else if (statut === "brouillon") {
+    where.statut = "brouillon"
+  }
   if (maladieId) where.maladieId = maladieId
   if (service) where.serviceDeclarant = { contains: service, mode: "insensitive" }
   if (search) {
@@ -119,11 +128,9 @@ export async function POST(req: Request) {
     }
 
     // Derive statut from observation or use provided statut
-    let statut: string = body.statut || "nouveau"
-    if (statut !== "brouillon") {
-      if (body.observation === "cas_confirme") statut = "confirme"
-      else if (body.observation === "cas_suspect") statut = "suspect"
-    }
+    let statut: string = body.statut || "suspect"
+    if (body.observation === "cas_confirme") statut = "confirme"
+    else if (body.observation === "cas_suspect") statut = "suspect"
 
     // Create case
     const data = body
@@ -230,7 +237,7 @@ export async function POST(req: Request) {
       })
     }
 
-    // Skip alert checking for brouillon
+    // Skip alert checking for drafts
     if (statut === "brouillon") {
       return NextResponse.json({ ...cas, declenchement: null }, { status: 201 })
     }

@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth"
 export async function GET() {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-  if (!["epidemiologiste", "admin"].includes(session.user.role)) {
+  if (session.user.role !== "admin") {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 })
   }
 
@@ -24,7 +24,7 @@ export async function GET() {
 export async function POST(req: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
-  if (!["epidemiologiste", "admin"].includes(session.user.role)) {
+  if (session.user.role !== "admin") {
     return NextResponse.json({ error: "Accès refusé" }, { status: 403 })
   }
 

@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth"
 import { notFound } from "next/navigation"
 import Link from "next/link"
+import { Copy } from "lucide-react"
 import { prisma } from "@/lib/prisma"
 import CasStatusBadge from "@/components/declarations/cas-status-badge"
 import CasExportPdfButton from "@/components/declarations/cas-export-pdf-button"
@@ -9,8 +10,15 @@ import { calculateAge, calculateAgeDetailed } from "@/utils/calculate-age"
 import type { CasStatut } from "@/types"
 import CasStatusChanger from "@/components/declarations/cas-status-changer"
 
-export default async function CasDetailPage({ params }: { params: Promise<{ casId: string }> }) {
+export default async function CasDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ casId: string }>
+  searchParams: Promise<{ tab?: string }>
+}) {
   const { casId } = await params
+  const { tab = "clinique" } = await searchParams
   const session = await auth()
 
   const cas = await prisma.casDeclare.findUnique({
@@ -48,6 +56,14 @@ export default async function CasDetailPage({ params }: { params: Promise<{ casI
 
   if (!cas) notFound()
 
+  // Timeline — audit log entries for this case
+  const timeline = await prisma.auditLog.findMany({
+    where: { OR: [{ entityId: casId }, { entityId: cas.patient.id }] },
+    orderBy: { createdAt: "asc" },
+    include: { user: { select: { firstName: true, lastName: true } } },
+    take: 50,
+  })
+
   const casTyped = cas as CasWithExtras
   const age = calculateAge(cas.patient.dateOfBirth)
   // Use stored age fields if available, otherwise calculate from date of birth
@@ -60,6 +76,16 @@ export default async function CasDetailPage({ params }: { params: Promise<{ casI
     : calculateAgeDetailed(cas.patient.dateOfBirth).label
 
   const canChangeStatus = session?.user.role === "epidemiologiste" || session?.user.role === "admin"
+
+  // Completeness score
+  const completenessFields = [
+    cas.patient.firstName, cas.patient.lastName, cas.patient.dateOfBirth, cas.patient.sex,
+    cas.patient.address, cas.patient.commune?.nom,
+    cas.maladie?.nom, cas.dateDebutSymptomes, casTyped.observation,
+    cas.service, cas.etablissement?.nom,
+  ]
+  const filled = completenessFields.filter(Boolean).length
+  const completeness = Math.round((filled / completenessFields.length) * 100)
 
   return (
     <div>
@@ -99,6 +125,9 @@ export default async function CasDetailPage({ params }: { params: Promise<{ casI
             notesCliniques: cas.notesCliniques ?? undefined,
             resultatLabo: cas.resultatLabo ?? undefined,
           }} />
+          <Link href={`/declarations/new?copy=${cas.id}`} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+            <Copy size={14} /> Copier
+          </Link>
           <Link href={`/declarations/${cas.id}/edit`} className="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
             Modifier
           </Link>
@@ -117,6 +146,25 @@ export default async function CasDetailPage({ params }: { params: Promise<{ casI
               <p className="font-semibold text-gray-800">{cas.patient.firstName} {cas.patient.lastName}</p>
               <p className="text-sm text-gray-500">{ageLabel} • {cas.patient.sex}</p>
             </div>
+            {/* Completeness bar */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-medium text-gray-500">Complétude</span>
+                <span className={`text-[11px] font-bold ${completeness >= 80 ? "text-green-600" : completeness >= 50 ? "text-amber-600" : "text-red-600"}`}>
+                  {completeness}%
+                </span>
+              </div>
+              <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${completeness}%`,
+                    backgroundColor: completeness >= 80 ? "#059669" : completeness >= 50 ? "#D97706" : "#DC2626",
+                  }}
+                />
+              </div>
+            </div>
+
             <div className="space-y-2 text-sm">
               {[
                 { label: "Identifiant", value: cas.patient.identifiant },
@@ -139,16 +187,64 @@ export default async function CasDetailPage({ params }: { params: Promise<{ casI
         <div className="flex-1 min-w-0">
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
             {/* Tab headers */}
-            <div className="flex border-b border-gray-100">
-              {["Données Cliniques", "Résultats Labo", "Investigation"].map((tab, i) => (
-                <span key={tab} className={`px-5 py-3 text-sm font-medium cursor-default ${i === 0 ? "border-b-2 text-[#1B4F8A]" : "text-gray-500"}`} style={i === 0 ? { borderBottomColor: "#1B4F8A" } : {}}>
-                  {tab}
-                </span>
+            <div className="flex border-b border-gray-100 overflow-x-auto">
+              {[
+                { key: "clinique", label: "Données Cliniques" },
+                { key: "labo", label: "Résultats Labo" },
+                { key: "investigation", label: "Investigation" },
+                { key: "timeline", label: "Chronologie" },
+              ].map(t => (
+                <Link
+                  key={t.key}
+                  href={`/declarations/${casId}?tab=${t.key}`}
+                  className={`px-5 py-3 text-sm font-medium whitespace-nowrap transition-colors ${
+                    tab === t.key
+                      ? "border-b-2 text-[#1B4F8A]"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                  style={tab === t.key ? { borderBottomColor: "#1B4F8A" } : {}}
+                >
+                  {t.label}
+                </Link>
               ))}
             </div>
 
-            {/* Tab content — Données Cliniques */}
-            <div className="p-5 space-y-4">
+            {/* Tab content */}
+            {tab === "timeline" && (
+              <div className="p-5">
+                {timeline.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center py-8">Aucun événement enregistré</p>
+                ) : (
+                  <div className="relative">
+                    <div className="absolute left-4 top-0 bottom-0 w-px bg-gray-100" />
+                    <div className="space-y-4">
+                      {[
+                        { createdAt: cas.createdAt, label: "Cas déclaré", detail: `Par ${cas.medecin ? `Dr. ${cas.medecin.firstName} ${cas.medecin.lastName}` : "—"}`, color: "#1B4F8A" },
+                        ...timeline.map(e => ({
+                          createdAt: e.createdAt,
+                          label: e.action,
+                          detail: e.user ? `${e.user.firstName} ${e.user.lastName}` : "Système",
+                          color: e.action.includes("delete") ? "#DC2626" : e.action.includes("create") ? "#059669" : "#6B7280",
+                        })),
+                      ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()).map((event, idx) => (
+                        <div key={idx} className="flex items-start gap-4 pl-2">
+                          <div className="w-6 h-6 rounded-full border-2 border-white shadow-sm flex items-center justify-center shrink-0 z-10" style={{ backgroundColor: event.color }}>
+                            <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                          </div>
+                          <div className="flex-1 pb-1">
+                            <p className="text-sm font-medium text-gray-800 capitalize">{event.label.replace(/_/g, " ")}</p>
+                            <p className="text-xs text-gray-500">{event.detail}</p>
+                            <p className="text-[11px] text-gray-400 mt-0.5">{formatDate(event.createdAt)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {tab !== "timeline" && <div className="p-5 space-y-4">
               {/* Observation badge — Confirmé / Suspect */}
               {casTyped.observation && (
                 <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
@@ -317,7 +413,7 @@ export default async function CasDetailPage({ params }: { params: Promise<{ casI
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Adresse Patient</p>
                 <p className="text-sm text-gray-700">{cas.patient.address}</p>
               </div>
-            </div>
+            </div>}
           </div>
         </div>
       </div>

@@ -16,7 +16,7 @@ export interface DashboardFiltersState {
   dateFin: string
   maladieIds: string[]
   wilayadIds: string[]
-  communeId: string
+  communeIds: string[]
 }
 
 interface Props {
@@ -158,14 +158,20 @@ function MultiSelect({
 }
 
 export default function DashboardFilters({ maladies, communes, wilayas, filters, onChange }: Props) {
+  const [showDateRange, setShowDateRange] = useState(
+    !!(filters.dateDebut || filters.dateFin)
+  )
+
   // Filter communes by selected wilayas
   const filteredCommunes = filters.wilayadIds.length > 0
     ? communes.filter(c => c.wilayadId && filters.wilayadIds.includes(c.wilayadId))
     : communes
 
+  const hasCustomDate = !!(filters.dateDebut || filters.dateFin)
+
   return (
     <div className="flex gap-2 flex-wrap items-center">
-      {/* Period quick-select */}
+      {/* Period quick-select + "Autre" */}
       <div className="flex rounded-lg border border-gray-200 overflow-hidden">
         {[
           { value: "7", label: "7j" },
@@ -176,9 +182,12 @@ export default function DashboardFilters({ maladies, communes, wilayas, filters,
           <button
             key={opt.value}
             type="button"
-            onClick={() => onChange({ ...filters, days: opt.value, dateDebut: "", dateFin: "" })}
+            onClick={() => {
+              setShowDateRange(false)
+              onChange({ ...filters, days: opt.value, dateDebut: "", dateFin: "" })
+            }}
             className={`px-3 h-[30px] text-[11px] font-semibold transition-all border-r border-gray-200 last:border-r-0 ${
-              filters.days === opt.value && !filters.dateDebut && !filters.dateFin
+              filters.days === opt.value && !hasCustomDate
                 ? "bg-[#1B4F8A] text-white"
                 : "bg-white text-gray-500 hover:bg-gray-50"
             }`}
@@ -186,62 +195,72 @@ export default function DashboardFilters({ maladies, communes, wilayas, filters,
             {opt.label}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setShowDateRange(v => !v)}
+          className={`px-3 h-[30px] text-[11px] font-semibold transition-all ${
+            showDateRange || hasCustomDate
+              ? "bg-[#1B4F8A] text-white"
+              : "bg-white text-gray-500 hover:bg-gray-50"
+          }`}
+        >
+          Autre
+        </button>
       </div>
 
-      {/* Custom date range */}
-      <div className="flex items-center gap-1">
-        <input
-          type="date"
-          value={filters.dateDebut}
-          onChange={e => onChange({ ...filters, dateDebut: e.target.value })}
-          className={cn(
-            "input h-[30px] text-[11px] font-medium w-32",
-            (filters.dateDebut || filters.dateFin) && "border-[#1B4F8A]"
+      {/* Custom date range — shown only when "Autre" is active */}
+      {(showDateRange || hasCustomDate) && (
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] text-gray-400 font-medium">Du</span>
+          <input
+            type="date"
+            value={filters.dateDebut}
+            onChange={e => onChange({ ...filters, dateDebut: e.target.value })}
+            className={cn(
+              "input h-[30px] text-[11px] font-medium w-32",
+              hasCustomDate && "border-[#1B4F8A]"
+            )}
+          />
+          <span className="text-[11px] text-gray-400 font-medium">à</span>
+          <input
+            type="date"
+            value={filters.dateFin}
+            onChange={e => onChange({ ...filters, dateFin: e.target.value })}
+            className={cn(
+              "input h-[30px] text-[11px] font-medium w-32",
+              hasCustomDate && "border-[#1B4F8A]"
+            )}
+          />
+          {hasCustomDate && (
+            <button
+              type="button"
+              onClick={() => { onChange({ ...filters, dateDebut: "", dateFin: "" }); setShowDateRange(false) }}
+              className="text-gray-400 hover:text-gray-600"
+              title="Réinitialiser dates"
+            >
+              <X size={12} />
+            </button>
           )}
-          title="Date début"
-        />
-        <span className="text-gray-400 text-xs">→</span>
-        <input
-          type="date"
-          value={filters.dateFin}
-          onChange={e => onChange({ ...filters, dateFin: e.target.value })}
-          className={cn(
-            "input h-[30px] text-[11px] font-medium w-32",
-            (filters.dateDebut || filters.dateFin) && "border-[#1B4F8A]"
-          )}
-          title="Date fin"
-        />
-        {(filters.dateDebut || filters.dateFin) && (
-          <button
-            type="button"
-            onClick={() => onChange({ ...filters, dateDebut: "", dateFin: "" })}
-            className="text-gray-400 hover:text-gray-600"
-            title="Réinitialiser dates"
-          >
-            <X size={12} />
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Wilayas multi-select */}
       <MultiSelect
         options={wilayas.map(w => ({ value: w.id, label: w.nom }))}
         selected={filters.wilayadIds}
-        onChange={wilayadIds => onChange({ ...filters, wilayadIds, communeId: "" })}
+        onChange={wilayadIds => onChange({ ...filters, wilayadIds, communeIds: [] })}
         placeholder="Toutes wilayas"
         width="min-w-[150px]"
       />
 
-      {/* Communes filtered by wilaya */}
-      <select
-        value={filters.communeId}
-        onChange={e => onChange({ ...filters, communeId: e.target.value })}
-        className="input h-[30px] text-[11px] font-medium w-auto min-w-[140px]"
-        style={{ paddingRight: "28px" }}
-      >
-        <option value="">Toutes communes</option>
-        {filteredCommunes.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-      </select>
+      {/* Communes multi-select (filtered by wilaya) */}
+      <MultiSelect
+        options={filteredCommunes.map(c => ({ value: c.id, label: c.nom }))}
+        selected={filters.communeIds}
+        onChange={communeIds => onChange({ ...filters, communeIds })}
+        placeholder="Toutes communes"
+        width="min-w-[140px]"
+      />
 
       {/* Maladies multi-select */}
       <MultiSelect

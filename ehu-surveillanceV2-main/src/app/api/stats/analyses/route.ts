@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   const maladieIds = maladieIdsParam ? maladieIdsParam.split(",").filter(Boolean) : []
   const maladieIdSingle = searchParams.get("maladieId") ?? ""
 
-  const communeId = searchParams.get("communeId") ?? ""
+  const communeIds = (searchParams.get("communeIds") ?? searchParams.get("communeId") ?? "").split(",").filter(Boolean)
   const wilayadIdsParam = searchParams.get("wilayadIds") ?? ""
   const wilayadIds = wilayadIdsParam ? wilayadIdsParam.split(",").filter(Boolean) : []
 
@@ -41,9 +41,11 @@ export async function GET(req: Request) {
     where.maladieId = maladieIdSingle
   }
 
-  // Geo filter — commune takes priority over wilaya
-  if (communeId) {
-    where.communeId = communeId
+  // Geo filter — communes take priority over wilaya
+  if (communeIds.length === 1) {
+    where.communeId = communeIds[0]
+  } else if (communeIds.length > 1) {
+    where.communeId = { in: communeIds }
   } else if (wilayadIds.length > 0) {
     where.commune = { wilayadId: { in: wilayadIds } }
   }

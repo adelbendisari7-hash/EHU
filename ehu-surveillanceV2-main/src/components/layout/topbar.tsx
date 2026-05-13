@@ -12,11 +12,15 @@ const BREADCRUMBS: Record<string, { label: string; parent?: string }> = {
   "/investigations": { label: "Investigations" },
   "/analyses": { label: "Analyses" },
   "/alertes": { label: "Alertes" },
-  "/alertes/groupes": { label: "Groupes de Maladies", parent: "/alertes" },
+  "/predictions": { label: "Prédictions", parent: "/analyses" },
   "/utilisateurs": { label: "Utilisateurs" },
   "/parametres": { label: "Paramètres" },
   "/profil": { label: "Mon Profil" },
   "/rapports": { label: "Rapports" },
+  "/parametres/historique": { label: "Historique Activités", parent: "/parametres" },
+  "/notifications": { label: "Notifications" },
+  "/mes-stats": { label: "Mes Statistiques" },
+  "/rapports/modeles": { label: "Modèles de Rapports", parent: "/rapports" },
 }
 
 function Breadcrumb({ pathname }: { pathname: string }) {

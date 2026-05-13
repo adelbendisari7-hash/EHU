@@ -52,9 +52,8 @@ export async function exportCasExcel(rows: CasRow[]) {
   const summaryRows = rows.length > 0 ? [
     { "Indicateur": "Total Cas", "Valeur": rows.length },
     { "Indicateur": "Cas Confirmés", "Valeur": rows.filter(r => r["Statut"] === "confirme").length },
-    { "Indicateur": "Cas En Cours", "Valeur": rows.filter(r => r["Statut"] === "en_cours").length },
-    { "Indicateur": "Cas Infirmés", "Valeur": rows.filter(r => r["Statut"] === "infirme").length },
-    { "Indicateur": "Cas Clôturés", "Valeur": rows.filter(r => r["Statut"] === "cloture").length },
+    { "Indicateur": "Cas Suspects", "Valeur": rows.filter(r => r["Statut"] === "suspect").length },
+    { "Indicateur": "Brouillons", "Valeur": rows.filter(r => r["Statut"] === "brouillon").length },
   ] : [{ "Indicateur": "Aucune donnée", "Valeur": 0 }]
 
   const wsSummary = XLSX.utils.json_to_sheet(summaryRows)
@@ -131,7 +130,7 @@ export async function exportAnalysesExcel(data: AnalyticsExcelData) {
 
   // Sheet 5 — Sex distribution
   const STATUT_LABELS: Record<string, string> = {
-    nouveau: "Nouveau", en_cours: "En cours", confirme: "Confirmé", infirme: "Infirmé", cloture: "Clôturé",
+    brouillon: "Brouillon", suspect: "Suspect", confirme: "Confirmé",
   }
   const sexRows = data.sexDistribution.map(d => ({
     "Sexe": d.name === "M" ? "Masculin" : d.name === "F" ? "Féminin" : d.name,

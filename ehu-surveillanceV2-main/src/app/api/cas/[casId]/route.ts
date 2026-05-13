@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
+import { checkAndTriggerThresholds } from "@/lib/check-thresholds"
 
 export async function GET(_req: Request, { params }: { params: Promise<{ casId: string }> }) {
   const session = await auth()
@@ -188,6 +189,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ casId:
           })),
         })
       }
+    }
+
+    // Trigger threshold check when case is confirmed or new
+    if (statut && ["confirme", "nouveau", "suspect"].includes(statut) && cas.maladieId) {
+      const cId: string | null = typeof body.communeId === "string" ? body.communeId : null
+      void checkAndTriggerThresholds(cas.maladieId, cId).catch(() => { /* non-blocking */ })
     }
 
     return NextResponse.json(cas)

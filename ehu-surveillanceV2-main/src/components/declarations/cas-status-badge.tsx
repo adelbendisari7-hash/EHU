@@ -1,8 +1,10 @@
 import { CAS_STATUTS } from "@/constants/statuts"
 import type { CasStatut } from "@/types"
 
-export default function CasStatusBadge({ statut }: { statut: CasStatut }) {
-  const config = CAS_STATUTS[statut]
+const FALLBACK = { label: "Suspect", color: "#D97706", bg: "#FFFBEB", border: "#FDE68A" }
+
+export default function CasStatusBadge({ statut }: { statut: string }) {
+  const config = CAS_STATUTS[statut as CasStatut] ?? FALLBACK
   return (
     <span
       className="badge"

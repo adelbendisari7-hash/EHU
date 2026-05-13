@@ -10,13 +10,14 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params
   const body = await req.json() as {
     isActive?: boolean; roleSlug?: string; roleIds?: string[];
-    firstName?: string; lastName?: string; password?: string
+    firstName?: string; lastName?: string; password?: string; email?: string
   }
 
   const data: Record<string, unknown> = {}
   if (body.isActive !== undefined) data.isActive = body.isActive
   if (body.firstName) data.firstName = body.firstName
   if (body.lastName) data.lastName = body.lastName
+  if (body.email) data.email = body.email
   if (body.password) data.passwordHash = await bcrypt.hash(body.password, 12)
 
   const user = await prisma.user.update({

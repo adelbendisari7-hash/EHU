@@ -3,6 +3,7 @@ export interface NavItem {
   href: string
   icon: string
   permission: string
+  isSubItem?: boolean
 }
 
 export const NAV_ITEMS: NavItem[] = [
@@ -11,10 +12,13 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Liste des Cas", href: "/declarations", icon: "List", permission: "cas.view_own" },
   { label: "Investigations", href: "/investigations", icon: "Search", permission: "investigation.view" },
   { label: "Analyses & Statistiques", href: "/analyses", icon: "BarChart", permission: "analyses.view" },
+  { label: "Prédictions", href: "/predictions", icon: "TrendingUp", permission: "analyses.view" },
   { label: "Rapports", href: "/rapports", icon: "FileBarChart", permission: "rapports.view" },
+  { label: "Modèles Rapports", href: "/rapports/modeles", icon: "LayoutTemplate", permission: "users.view", isSubItem: true },
   { label: "Alertes", href: "/alertes", icon: "AlertTriangle", permission: "alertes.view" },
-  { label: "Groupes de Maladies", href: "/alertes/groupes", icon: "Shield", permission: "alertes.view" },
   { label: "Utilisateurs", href: "/utilisateurs", icon: "Users", permission: "users.view" },
   { label: "Rôles", href: "/roles", icon: "Shield", permission: "roles.manage" },
-  { label: "Paramètres", href: "/parametres", icon: "Settings", permission: "protocoles.view" },
+  { label: "Paramètres", href: "/parametres", icon: "Settings", permission: "users.view" },
+  { label: "Historique", href: "/parametres/historique", icon: "History", permission: "users.view" },
+  { label: "Notifications", href: "/notifications", icon: "Bell", permission: "dashboard.view" },
 ]

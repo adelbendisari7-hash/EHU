@@ -5,7 +5,7 @@ import dynamic from "next/dynamic"
 import DashboardFilters, { type DashboardFiltersState } from "./dashboard-filters"
 import EpidemicCurve from "./epidemic-curve"
 import DiseaseDistribution from "./disease-distribution"
-import StatCards from "./stat-cards"
+import StatCards, { type DashboardStats } from "./stat-cards"
 import { DashboardSkeleton, Sk } from "@/components/shared/skeleton"
 import { AlertCircle, RefreshCw } from "lucide-react"
 
@@ -25,9 +25,12 @@ interface Maladie { id: string; nom: string }
 interface Commune { id: string; nom: string; wilayadId?: string }
 interface Wilaya { id: string; nom: string; code: string }
 
+interface WilayaStat { id: string; code: string; nom: string; count: number }
+
 interface DashboardData {
-  stats: { totalActifs: number; totalAlertes: number; totalMaladies: number }
+  stats: DashboardStats
   mapMarkers: Array<{ id: string; lat: number; lng: number; statut: string; maladie: string; commune: string; date: string }>
+  wilayaStats: WilayaStat[]
   epidemicCurve: Array<{ date: string; count: number }>
   diseaseDistribution: Array<{ name: string; count: number }>
 }
@@ -46,7 +49,7 @@ export default function DashboardClient({ maladies, communes, wilayas, userName 
     dateFin: "",
     maladieIds: [],
     wilayadIds: [],
-    communeId: "",
+    communeIds: [],
   })
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -59,7 +62,7 @@ export default function DashboardClient({ maladies, communes, wilayas, userName 
       const params = new URLSearchParams({ days: filters.days })
       if (filters.dateDebut) params.set("dateDebut", filters.dateDebut)
       if (filters.dateFin) params.set("dateFin", filters.dateFin)
-      if (filters.communeId) params.set("communeId", filters.communeId)
+      if (filters.communeIds.length > 0) params.set("communeIds", filters.communeIds.join(","))
       if (filters.maladieIds.length > 0) params.set("maladieIds", filters.maladieIds.join(","))
       if (filters.wilayadIds.length > 0) params.set("wilayadIds", filters.wilayadIds.join(","))
       const res = await fetch(`/api/stats/dashboard?${params}`)
@@ -114,7 +117,12 @@ export default function DashboardClient({ maladies, communes, wilayas, userName 
                 <span className="text-[11px] text-gray-400 font-medium">Wilaya d&apos;Oran</span>
               </div>
               <div className="rounded-lg overflow-hidden" style={{ height: "340px" }}>
-                <EpidemicMap markers={data!.mapMarkers} />
+                <EpidemicMap
+                  markers={data!.mapMarkers}
+                  wilayaStats={data!.wilayaStats ?? []}
+                  selectedWilayadIds={filters.wilayadIds}
+                  allWilayas={wilayas}
+                />
               </div>
             </div>
             <div className="card p-5">

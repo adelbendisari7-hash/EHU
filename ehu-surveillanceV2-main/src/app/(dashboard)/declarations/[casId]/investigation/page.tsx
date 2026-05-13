@@ -142,7 +142,7 @@ export default function InvestigationPage() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
               <p className="text-sm font-semibold text-gray-700 mb-3">Localisation du Cas</p>
               <div style={{ height: "280px" }}>
-                <EpidemicMap markers={mapMarkers} />
+                <EpidemicMap markers={mapMarkers} wilayaStats={[]} selectedWilayadIds={[]} />
               </div>
             </div>
 

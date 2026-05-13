@@ -2,10 +2,10 @@ import { describe, it, expect } from "vitest"
 import { CAS_STATUTS } from "@/constants/statuts"
 
 describe("CAS_STATUTS", () => {
-  const expectedStatuts = ["nouveau", "en_cours", "confirme", "infirme", "cloture"]
+  const expectedStatuts = ["brouillon", "suspect", "confirme"]
 
-  it("has all 5 case statuses", () => {
-    expect(Object.keys(CAS_STATUTS)).toHaveLength(5)
+  it("has exactly 3 case statuses", () => {
+    expect(Object.keys(CAS_STATUTS)).toHaveLength(3)
     for (const s of expectedStatuts) {
       expect(CAS_STATUTS).toHaveProperty(s)
     }
@@ -24,21 +24,17 @@ describe("CAS_STATUTS", () => {
     expect(CAS_STATUTS.confirme.color).toBe("#DC2626")
   })
 
-  it("clôturé is green (success semantic)", () => {
-    expect(CAS_STATUTS.cloture.color).toBe("#059669")
+  it("suspect is amber/orange (warning semantic)", () => {
+    expect(CAS_STATUTS.suspect.color).toBe("#D97706")
   })
 
-  it("infirmé is gray (neutral semantic)", () => {
-    expect(CAS_STATUTS.infirme.color).toBe("#6B7280")
-  })
-
-  it("en_cours is amber/orange (warning semantic)", () => {
-    expect(CAS_STATUTS.en_cours.color).toBe("#D97706")
+  it("brouillon is gray (neutral semantic)", () => {
+    expect(CAS_STATUTS.brouillon.color).toBe("#6B7280")
   })
 
   it("labels are in French", () => {
-    expect(CAS_STATUTS.nouveau.label).toBe("Nouveau")
+    expect(CAS_STATUTS.brouillon.label).toBe("Brouillon")
+    expect(CAS_STATUTS.suspect.label).toBe("Suspect")
     expect(CAS_STATUTS.confirme.label).toBe("Confirmé")
-    expect(CAS_STATUTS.cloture.label).toBe("Clôturé")
   })
 })

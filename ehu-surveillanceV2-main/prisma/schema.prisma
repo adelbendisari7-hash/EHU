@@ -11,12 +11,8 @@ datasource db {
 
 enum CasStatut {
   brouillon
-  nouveau
-  en_cours
-  confirme
   suspect
-  infirme
-  cloture
+  confirme
 }
 
 enum AlerteType {
@@ -216,7 +212,7 @@ model CasDeclare {
   dateDiagnostic     DateTime? @map("date_diagnostic")
   modeConfirmation   String?  @map("mode_confirmation")
   resultatLabo       String?  @map("resultat_labo")
-  statut             CasStatut        @default(nouveau)
+  statut             CasStatut        @default(suspect)
   etablissementId    String?          @map("etablissement_id")
   service            String?
   medecinId          String?          @map("medecin_id")

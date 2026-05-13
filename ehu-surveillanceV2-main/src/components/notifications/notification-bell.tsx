@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Bell, X, Check } from "lucide-react"
+import Link from "next/link"
 import { formatDateTime } from "@/utils/format-date"
 
 interface Notification {
@@ -37,7 +38,7 @@ export default function NotificationBell() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void fetchNotifications()
-    const interval = setInterval(() => { void fetchNotifications() }, 30000)
+    const interval = setInterval(() => { void fetchNotifications() }, 10000)
     return () => clearInterval(interval)
   }, [])
 
@@ -107,6 +108,13 @@ export default function NotificationBell() {
                 <X size={14} className="text-gray-400" />
               </button>
             </div>
+          </div>
+
+          {/* Footer link */}
+          <div className="px-4 py-2 border-b border-gray-100">
+            <Link href="/notifications" onClick={() => setOpen(false)} className="text-[11px] text-blue-600 hover:text-blue-800 font-medium transition-colors">
+              Voir toutes les notifications →
+            </Link>
           </div>
 
           {/* List */}

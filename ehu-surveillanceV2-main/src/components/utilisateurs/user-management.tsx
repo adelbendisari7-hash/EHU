@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { UserPlus, Power, X, Eye, EyeOff } from "lucide-react"
+import { UserPlus, Power, X, Eye, EyeOff, Pencil } from "lucide-react"
 import { cn } from "@/utils/cn"
 import { formatDate } from "@/utils/format-date"
 import { toast } from "sonner"
@@ -14,6 +14,7 @@ interface User {
   role: string
   isActive: boolean
   createdAt: string
+  lastLogin: string | null
   etablissement: { nom: string } | null
   wilaya: { nom: string } | null
 }
@@ -49,6 +50,12 @@ export default function UserManagement({ initialUsers, etablissements, wilayas }
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
 
+  // Edit modal state
+  const [editUser, setEditUser] = useState<User | null>(null)
+  const [editForm, setEditForm] = useState({ email: "", password: "", firstName: "", lastName: "" })
+  const [editShowPassword, setEditShowPassword] = useState(false)
+  const [editSubmitting, setEditSubmitting] = useState(false)
+
   // wilayas is available for future use
   void wilayas
 
@@ -80,6 +87,41 @@ export default function UserManagement({ initialUsers, etablissements, wilayas }
       toast.success(`Utilisateur ${newUser.firstName} ${newUser.lastName} créé`)
     }
     setSubmitting(false)
+  }
+
+  const openEdit = (u: User) => {
+    setEditUser(u)
+    setEditForm({ email: u.email, password: "", firstName: u.firstName, lastName: u.lastName })
+    setEditShowPassword(false)
+  }
+
+  const submitEdit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editUser) return
+    setEditSubmitting(true)
+    const payload: Record<string, string> = {
+      firstName: editForm.firstName,
+      lastName: editForm.lastName,
+      email: editForm.email,
+    }
+    if (editForm.password) payload.password = editForm.password
+    const res = await fetch(`/api/users/${editUser.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+    if (res.ok) {
+      setUsers(prev => prev.map(u => u.id === editUser.id
+        ? { ...u, firstName: editForm.firstName, lastName: editForm.lastName, email: editForm.email }
+        : u
+      ))
+      toast.success("Utilisateur modifié avec succès")
+      setEditUser(null)
+    } else {
+      const err = await res.json() as { error?: string }
+      toast.error(err.error ?? "Erreur lors de la modification")
+    }
+    setEditSubmitting(false)
   }
 
   const toggleActive = async (id: string, current: boolean) => {
@@ -181,14 +223,14 @@ export default function UserManagement({ initialUsers, etablissements, wilayas }
         <table className="w-full">
           <thead>
             <tr style={{ backgroundColor: "#F5F6F7" }}>
-              {["Utilisateur", "Rôle", "Établissement", "Statut", "Créé le", "Actions"].map(h => (
+              {["Utilisateur", "Rôle", "Établissement", "Statut", "Créé le", "Dernière connexion", "Actions"].map(h => (
                 <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-400">{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {!filtered.length ? (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">Aucun utilisateur</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-sm text-gray-400">Aucun utilisateur</td></tr>
             ) : filtered.map((u, i) => {
               const rc = ROLE_COLORS[u.role] ?? ROLE_COLORS.medecin
               return (
@@ -216,8 +258,12 @@ export default function UserManagement({ initialUsers, etablissements, wilayas }
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">{formatDate(u.createdAt)}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{u.lastLogin ? formatDate(u.lastLogin) : <span className="text-gray-300">—</span>}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
+                      <button onClick={() => openEdit(u)} title="Modifier" className="p-1.5 rounded hover:bg-blue-50 transition-colors">
+                        <Pencil size={14} style={{ color: "#1B4F8A" }} />
+                      </button>
                       <button onClick={() => toggleActive(u.id, u.isActive)} title={u.isActive ? "Désactiver" : "Activer"} className="p-1.5 rounded hover:bg-gray-100 transition-colors">
                         <Power size={14} style={{ color: u.isActive ? "#E74C3C" : "#27AE60" }} />
                       </button>
@@ -229,6 +275,68 @@ export default function UserManagement({ initialUsers, etablissements, wilayas }
           </tbody>
         </table>
       </div>
+
+      {/* Edit modal */}
+      {editUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-[14px] font-semibold text-gray-800">Modifier l&apos;utilisateur</h3>
+                <p className="text-[12px] text-gray-400 mt-0.5">{editUser.firstName} {editUser.lastName}</p>
+              </div>
+              <button onClick={() => setEditUser(null)} className="p-1 rounded hover:bg-gray-100">
+                <X size={16} className="text-gray-400" />
+              </button>
+            </div>
+            <form onSubmit={submitEdit} className="p-5 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Prénom</label>
+                  <input value={editForm.firstName} onChange={e => setEditForm(f => ({ ...f, firstName: e.target.value }))} className={input} required />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Nom</label>
+                  <input value={editForm.lastName} onChange={e => setEditForm(f => ({ ...f, lastName: e.target.value }))} className={input} required />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Adresse email</label>
+                <input type="email" value={editForm.email} onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))} className={input} required />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Nouveau mot de passe <span className="text-gray-400 font-normal">(laisser vide pour ne pas changer)</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type={editShowPassword ? "text" : "password"}
+                    value={editForm.password}
+                    onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))}
+                    className={cn(input, "pr-9")}
+                    minLength={editForm.password ? 8 : undefined}
+                    placeholder="••••••••"
+                  />
+                  <button type="button" onClick={() => setEditShowPassword(v => !v)} tabIndex={-1} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    {editShowPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </button>
+                </div>
+                {editForm.password && editForm.password.length < 8 && (
+                  <p className="text-[11px] text-red-500 mt-1">Minimum 8 caractères</p>
+                )}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={editSubmitting || (!!editForm.password && editForm.password.length < 8)} className="flex-1 py-2 rounded-lg text-sm font-medium text-white disabled:opacity-60" style={{ backgroundColor: "#1B4F8A" }}>
+                  {editSubmitting ? "Enregistrement..." : "Enregistrer les modifications"}
+                </button>
+                <button type="button" onClick={() => setEditUser(null)} className="px-4 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+                  Annuler
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

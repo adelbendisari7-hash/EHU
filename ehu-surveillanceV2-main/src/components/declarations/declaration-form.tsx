@@ -8,13 +8,11 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/utils/cn"
 import ProtocoleAlertModal from "@/components/protocoles/protocole-alert-modal"
-import OcrScanner from "@/components/declarations/ocr-scanner"
 import DiseaseCombobox from "@/components/ui/disease-combobox"
 import FormHeaderSection from "@/components/declarations/form-header-section"
 import FicheDynamiqueRenderer from "@/components/declarations/fiche-dynamique-renderer"
 import { toast } from "sonner"
-import { Scan, AlertCircle, CheckCircle2, Loader2, Plus, X, Search, ChevronDown, FileText } from "lucide-react"
-import type { OcrScanResult } from "@/hooks/use-ocr-scan"
+import { AlertCircle, CheckCircle2, Loader2, Plus, X, Search, ChevronDown, FileText } from "lucide-react"
 import { NATIONALITIES } from "@/constants/nationalities"
 import { SYMPTOM_CATEGORIES } from "@/constants/symptoms"
 import { SAMPLE_TYPES } from "@/constants/sample-types"
@@ -172,6 +170,98 @@ function toDateStr(val: string | null | undefined): string {
   try { return new Date(val).toISOString().slice(0, 10) } catch { return "" }
 }
 
+// Strip diacritics for accent-insensitive matching
+function stripAccents(s: string) {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "")
+}
+
+function getRelevantSymptomCategories(maladieName: string, codeCim10?: string): string[] {
+  if (!maladieName) return []
+  // Strip accents so "typhoïde" matches "typho", "méningite" matches "meningit", etc.
+  const name = stripAccents(maladieName.toLowerCase())
+  const code = (codeCim10 ?? "").toUpperCase()
+  const cats = new Set<string>()
+
+  // ── By CIM-10 code prefix (most reliable) ──────────────────────────────
+  if (/^J/.test(code))                      { cats.add("general"); cats.add("respiratoire"); cats.add("orl") }
+  if (/^A0[0-9]/.test(code))               { cats.add("general"); cats.add("digestif") }        // diarrhées / entérites
+  if (/^A1[5-9]/.test(code))               { cats.add("general"); cats.add("respiratoire") }     // tuberculose
+  if (/^A2[0-9]/.test(code))               { cats.add("general"); cats.add("musculosquelettique") } // zoonoses
+  if (/^A3[3-7]/.test(code))               { cats.add("general"); cats.add("neurologique") }     // tétanos, coqueluche
+  if (/^A7[5-9]/.test(code))               { cats.add("general"); cats.add("cutane"); cats.add("neurologique") } // rickettsioses
+  if (/^A8[0-9]/.test(code))               { cats.add("general"); cats.add("neurologique") }     // infections virales SNC
+  if (/^A9[0-9]/.test(code))               { cats.add("general"); cats.add("cutane") }           // arbovirus / dengue
+  if (/^B0[0-9]/.test(code))               { cats.add("general"); cats.add("cutane") }           // infections virales cutanées
+  if (/^B1[5-9]/.test(code))               { cats.add("general"); cats.add("digestif") }         // hépatites virales
+  if (/^B5[0-9]|^B6[0-4]/.test(code))     { cats.add("general"); cats.add("cutane"); cats.add("neurologique") } // paludisme / leishmanios
+  if (/^G0[0-9]/.test(code))               { cats.add("general"); cats.add("neurologique") }     // méningites
+  if (/^H1[0-9]/.test(code))               { cats.add("general"); cats.add("ophtalmologique") }  // maladies oculaires
+  if (/^[IN]/.test(code))                  { cats.add("general"); cats.add("cardiovasculaire") }
+  if (/^M/.test(code))                     { cats.add("general"); cats.add("musculosquelettique") }
+  if (/^N/.test(code))                     { cats.add("general"); cats.add("urinaire") }
+
+  // ── By name (accent-stripped, so one pattern covers accented + non-accented) ──
+  if (/respirat|pneumon|tubercul|grippe|covid|coqueluche|bronchit|pleur|emphys/.test(name)) {
+    cats.add("general"); cats.add("respiratoire"); cats.add("orl")
+  }
+  if (/diarrhee|gastro|intestin|cholera|typho|salmonell|dysenter|hepatit|ictere/.test(name)) {
+    cats.add("general"); cats.add("digestif")
+  }
+  if (/meningit|encephal|tetanos|polio|paralys|rage/.test(name)) {
+    cats.add("general"); cats.add("neurologique")
+  }
+  if (/rougeol|varicell|variole|rubeo|scarlatine|lepre|gale|teigne/.test(name)) {
+    cats.add("general"); cats.add("cutane")
+  }
+  if (/paludism|malaria|dengue|arbovirus|leishmani|fievre jaune|ricketts|chikungunya/.test(name)) {
+    cats.add("general"); cats.add("cutane"); cats.add("neurologique")
+  }
+  if (/urinair|itu|pyelon|cystit/.test(name)) {
+    cats.add("general"); cats.add("urinaire")
+  }
+  if (/arthrit|rhumat|osteo|brucell/.test(name)) {
+    cats.add("general"); cats.add("musculosquelettique")
+  }
+  if (/angine|pharyngit|sinusit|amygdalit/.test(name)) {
+    cats.add("general"); cats.add("orl")
+  }
+  if (/conjonctiv/.test(name)) {
+    cats.add("general"); cats.add("ophtalmologique")
+  }
+  if (/cardio|endocardit|myocardit|pericardi/.test(name)) {
+    cats.add("general"); cats.add("cardiovasculaire")
+  }
+
+  return Array.from(cats) // empty array = no specific match → show all
+}
+
+// Smart age: returns value + best unit based on age magnitude
+function calculateSmartAge(dateString: string): { value: number; unit: "ans" | "mois" | "jours" } | null {
+  try {
+    const dob = new Date(dateString)
+    if (isNaN(dob.getTime())) return null
+    const today = new Date()
+    const diffMs = today.getTime() - dob.getTime()
+    if (diffMs < 0) return null
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays >= 365) {
+      let ans = today.getFullYear() - dob.getFullYear()
+      const beforeBirthday =
+        today.getMonth() < dob.getMonth() ||
+        (today.getMonth() === dob.getMonth() && today.getDate() < dob.getDate())
+      if (beforeBirthday) ans--
+      return { value: Math.max(0, ans), unit: "ans" }
+    }
+    if (diffDays >= 30) {
+      return { value: Math.floor(diffDays / 30.44), unit: "mois" }
+    }
+    return { value: diffDays, unit: "jours" }
+  } catch {
+    return null
+  }
+}
+
 function calculateAgeDetailed(dateString: string): { ans: number; mois: number; jours: number } | null {
   try {
     const dob = new Date(dateString)
@@ -273,7 +363,7 @@ function SearchableSelect({
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
-export default function DeclarationForm({ casId }: { casId?: string } = {}) {
+export default function DeclarationForm({ casId, copyId }: { casId?: string; copyId?: string } = {}) {
   const router = useRouter()
   const isEditMode = !!casId
 
@@ -299,7 +389,6 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
   const [pendingCasId, setPendingCasId] = useState<string | null>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [declenchement, setDeclenchement] = useState<any>(null)
-  const [showScanner, setShowScanner] = useState(false)
   const [ficheSpecifiqueSlug, setFicheSpecifiqueSlug] = useState<string | null>(null)
 
   // Feature state
@@ -310,6 +399,15 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
   const [casSearchResults, setCasSearchResults] = useState<CasSearchResult[]>([])
   const [casSearchLoading, setCasSearchLoading] = useState(false)
   const [selectedCasSimilaire, setSelectedCasSimilaire] = useState<CasSearchResult | null>(null)
+
+  // Duplicate detection
+  const [duplicates, setDuplicates] = useState<{ id: string; codeCas: string; statut: string; maladie: string }[]>([])
+  const [dismissDuplicates, setDismissDuplicates] = useState(false)
+
+  // Age unit selector state
+  const [ageUnit, setAgeUnit] = useState<"ans" | "mois" | "jours">("ans")
+  const ageUnitRef = useRef<"ans" | "mois" | "jours">("ans")
+  ageUnitRef.current = ageUnit
 
   // Prevent circular DOB <-> age updates
   const ageChangedByUser = useRef(false)
@@ -338,6 +436,8 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
   })
 
   // Watched values
+  const firstName = watch("firstName")
+  const lastName = watch("lastName")
   const dateOfBirth = watch("dateOfBirth")
   const ageAns = watch("ageAns")
   const wilayadId = watch("wilayadId")
@@ -353,7 +453,7 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
   // Effects
   // ---------------------------------------------------------------------------
 
-  // DOB → age (only when DOB changes by user, not by age calculation)
+  // DOB → smart age (auto unit: ans if ≥1 year, mois if ≥1 month, jours otherwise)
   useEffect(() => {
     if (ageChangedByUser.current) {
       ageChangedByUser.current = false
@@ -361,23 +461,24 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
     }
     if (dateOfBirth) {
       dobChangedByUser.current = true
-      const age = calculateAgeDetailed(dateOfBirth)
-      if (age) {
-        setValue("ageAns", age.ans)
-        setValue("ageMois", age.mois)
-        setValue("ageJours", age.jours)
+      const result = calculateSmartAge(dateOfBirth)
+      if (result) {
+        setValue("ageAns", result.unit === "ans" ? result.value : undefined)
+        setValue("ageMois", result.unit === "mois" ? result.value : undefined)
+        setValue("ageJours", result.unit === "jours" ? result.value : undefined)
+        setAgeUnit(result.unit)
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateOfBirth, setValue])
 
-  // ageAns → DOB (set to June 30 of the calculated year)
+  // ageAns → DOB (only when unit is "ans"; set to June 30 of the calculated year)
   useEffect(() => {
     if (dobChangedByUser.current) {
       dobChangedByUser.current = false
       return
     }
-    if (ageAns !== undefined && ageAns !== null && !isNaN(ageAns as number)) {
+    if (ageUnitRef.current === "ans" && ageAns !== undefined && ageAns !== null && !isNaN(ageAns as number)) {
       ageChangedByUser.current = true
       const year = new Date().getFullYear() - (ageAns as number)
       setValue("dateOfBirth", `${year}-06-30`)
@@ -396,6 +497,28 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
       setFilteredCommunes(allCommunes)
     }
   }, [wilayadId, allCommunes, setValue])
+
+  // Duplicate patient check — fires when all three identity fields are filled (create mode only)
+  useEffect(() => {
+    if (isEditMode) return
+    if (!firstName || firstName.length < 2 || !lastName || lastName.length < 2) {
+      setDuplicates([])
+      return
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const params = new URLSearchParams({ firstName: firstName.trim(), lastName: lastName.trim() })
+        if (dateOfBirth) params.set("dateOfBirth", dateOfBirth)
+        const res = await fetch(`/api/patients/check-duplicate?${params}`)
+        if (!res.ok) return
+        const data = await res.json()
+        setDuplicates(data.matches ?? [])
+        setDismissDuplicates(false)
+      } catch { /* silent */ }
+    }, 800)
+    return () => clearTimeout(timer)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstName, lastName, dateOfBirth, isEditMode])
 
   // Load reference data — create mode only
   useEffect(() => {
@@ -585,6 +708,31 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [casId])
 
+  // Load source case data for copy mode (pre-fill clinical data, exclude patient identity)
+  useEffect(() => {
+    if (!copyId || isEditMode) return
+
+    fetch(`/api/cas/${copyId}`)
+      .then(r => r.json())
+      .then(caseData => {
+        setValue("maladieId", caseData.maladieId ?? "")
+        setValue("symptomesTexte", caseData.symptomesTexte ?? "")
+        if (caseData.observation) setValue("observation", caseData.observation)
+        if (caseData.modeConfirmation) setValue("modeConfirmation", caseData.modeConfirmation)
+        setValue("atcd", caseData.atcd ?? "")
+        setValue("service", caseData.service ?? "")
+        setValue("notesCliniques", caseData.notesCliniques ?? "")
+        setValue("etablissementId", caseData.etablissementId ?? "")
+        setValue("serviceDeclarant", caseData.serviceDeclarant ?? "")
+        if (Array.isArray(caseData.symptomes)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          setSelectedSymptomeIds(caseData.symptomes.map((s: any) => s.symptomeId))
+        }
+      })
+      .catch(console.error)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copyId])
+
   useEffect(() => {
     if (maladieId) {
       const found = maladies.find(m => m.id === maladieId)
@@ -726,6 +874,57 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
   }
 
   // ---------------------------------------------------------------------------
+  // Auto-save on page unload (create mode only)
+  // ---------------------------------------------------------------------------
+  const autoSaveRef = useRef(false)
+  useEffect(() => {
+    if (isEditMode) return
+    const handler = (e: BeforeUnloadEvent) => {
+      const vals = getValues()
+      const hasData = vals.firstName || vals.lastName || vals.maladieId
+      if (!hasData || autoSaveRef.current) return
+      e.preventDefault()
+      e.returnValue = ""
+    }
+    window.addEventListener("beforeunload", handler)
+    return () => window.removeEventListener("beforeunload", handler)
+  }, [isEditMode, getValues])
+
+  // Auto-save brouillon when navigating away via Next.js router (create mode)
+  useEffect(() => {
+    if (isEditMode) return
+    const handleRouteChange = async () => {
+      if (autoSaveRef.current) return
+      const vals = getValues()
+      const hasData = vals.firstName || vals.lastName || vals.maladieId
+      if (!hasData) return
+      autoSaveRef.current = true
+      try {
+        const parsed = brouillonSchema.safeParse(vals)
+        const data = parsed.success ? parsed.data : vals
+        const payload = buildPayload(data, "brouillon")
+        await fetch("/api/cas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        })
+        toast.success("Brouillon sauvegardé automatiquement", { duration: 3000 })
+      } catch { /* silent */ }
+    }
+    const originalPush = router.push.bind(router)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    ;(router as any).push = async (...args: Parameters<typeof router.push>) => {
+      await handleRouteChange()
+      return originalPush(...args)
+    }
+    return () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ;(router as any).push = originalPush
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isEditMode])
+
+  // ---------------------------------------------------------------------------
   // Save as brouillon — create mode only
   // ---------------------------------------------------------------------------
   const saveBrouillon = async () => {
@@ -759,26 +958,6 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
     } finally {
       setBrouillonLoading(false)
     }
-  }
-
-  // ---------------------------------------------------------------------------
-  // OCR Apply
-  // ---------------------------------------------------------------------------
-  const applyOcrData = (data: OcrScanResult["data"]) => {
-    const p = data.patient
-    const m = data.maladie
-    const med = data.medical
-    if (p.prenom.value) setValue("firstName", p.prenom.value)
-    if (p.nom.value) setValue("lastName", p.nom.value)
-    if (p.date_naissance.value) setValue("dateOfBirth", p.date_naissance.value)
-    if (p.sexe.value && (p.sexe.value === "homme" || p.sexe.value === "femme")) setValue("sex", p.sexe.value)
-    if (p.adresse.value) setValue("address", p.adresse.value)
-    if (p.commune_id.value) setValue("communeId", p.commune_id.value)
-    if (m.maladie_id.value) setValue("maladieId", m.maladie_id.value)
-    if (m.date_debut_symptomes.value) setValue("dateDebutSymptomes", m.date_debut_symptomes.value)
-    if (m.date_diagnostic.value) setValue("dateDiagnostic", m.date_diagnostic.value)
-    if (med.etablissement_id.value) setValue("etablissementId", med.etablissement_id.value)
-    if (med.service.value) setValue("service", med.service.value)
   }
 
   // ---------------------------------------------------------------------------
@@ -855,10 +1034,18 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
     </div>
   )
 
+  const relevantSymptomCategories = selectedMaladie
+    ? getRelevantSymptomCategories(selectedMaladie.nom, selectedMaladie.codeCim10)
+    : []
+
   const symptomesByCategory = SYMPTOM_CATEGORIES.map(cat => ({
     ...cat,
     items: symptomes.filter(s => s.categorie === cat.key),
-  })).filter(g => g.items.length > 0)
+  })).filter(g => {
+    if (g.items.length === 0) return false
+    if (relevantSymptomCategories.length === 0) return true
+    return relevantSymptomCategories.includes(g.key)
+  })
 
   // ---------------------------------------------------------------------------
   // Loading spinner (edit mode while fetching case data)
@@ -876,10 +1063,6 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
   // ---------------------------------------------------------------------------
   return (
     <>
-      {showScanner && (
-        <OcrScanner onApply={applyOcrData} onClose={() => setShowScanner(false)} />
-      )}
-
       {!isEditMode && declenchement && (
         <ProtocoleAlertModal
           declenchement={declenchement}
@@ -892,21 +1075,36 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
       )}
 
       {/* Top bar */}
-      <div className="max-w-3xl mb-5 flex items-center justify-between">
-        <div>
-          <p className="text-[13px] text-gray-500">
-            Remplissez le formulaire ou scannez un document papier.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowScanner(true)}
-          className="btn btn-secondary"
-        >
-          <Scan size={14} />
-          Scanner
-        </button>
+      <div className="max-w-3xl mb-5">
+        <p className="text-[13px] text-gray-500">
+          Remplissez le formulaire ci-dessous pour déclarer un nouveau cas.
+        </p>
       </div>
+
+      {/* Duplicate patient warning */}
+      {duplicates.length > 0 && !dismissDuplicates && (
+        <div className="max-w-3xl mb-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <AlertCircle size={16} className="text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-amber-800">Patient(s) similaire(s) trouvé(s)</p>
+                <p className="text-xs text-amber-700 mt-0.5">Un ou plusieurs patients avec le même nom existent déjà dans le système. Vérifiez avant de soumettre :</p>
+                <ul className="mt-1.5 space-y-0.5">
+                  {duplicates.map(d => (
+                    <li key={d.id} className="text-xs text-amber-800">
+                      • <span className="font-medium">{d.codeCas}</span> — {d.maladie} — <span className="capitalize">{d.statut}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+            <button type="button" onClick={() => setDismissDuplicates(true)} className="text-amber-500 hover:text-amber-700 shrink-0">
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="max-w-3xl space-y-6">
 
@@ -917,12 +1115,6 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
         <div className="card">
           <SectionHeader letter="1" title="Informations Administratives" />
           <div className="p-5 grid grid-cols-2 gap-4">
-
-            {/* Date de déclaration */}
-            <div>
-              <label className="label">Date de déclaration</label>
-              <input {...register("dateDeclaration")} type="date" className={inputCls(false)} />
-            </div>
 
             {/* Nom */}
             <div>
@@ -938,65 +1130,67 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
               <FieldError msg={errors.firstName?.message} />
             </div>
 
-            {/* NIN */}
-            <div>
+            {/* NIN — full width */}
+            <div className="col-span-2">
               <label className="label">NIN (Numéro d&apos;Identification National)</label>
               <input {...register("nin")} className={inputCls(false)} placeholder="18 caractères max" maxLength={18} />
             </div>
 
-            {/* Date de naissance */}
-            <div>
-              <label className="label">Date de naissance</label>
-              <input
-                {...register("dateOfBirth")}
-                type="date"
-                className={inputCls(false)}
-                onChange={e => {
-                  dobChangedByUser.current = true
-                  ageChangedByUser.current = false
-                  register("dateOfBirth").onChange(e)
-                }}
-              />
-            </div>
-
-            {/* Age — 3 fields */}
-            <div>
-              <label className="label">Âge (Ans / Mois / Jours)</label>
-              <div className="flex gap-2">
-                <div className="flex-1">
+            {/* Date de naissance + Âge — full-width row, side by side */}
+            <div className="col-span-2">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Date de naissance</label>
                   <input
-                    {...register("ageAns", { valueAsNumber: true })}
-                    type="number"
-                    min={0}
-                    max={150}
+                    {...register("dateOfBirth")}
+                    type="date"
                     className={inputCls(false)}
-                    placeholder="Ans"
                     onChange={e => {
-                      ageChangedByUser.current = true
-                      dobChangedByUser.current = false
-                      register("ageAns", { valueAsNumber: true }).onChange(e)
+                      dobChangedByUser.current = true
+                      ageChangedByUser.current = false
+                      register("dateOfBirth").onChange(e)
                     }}
                   />
                 </div>
-                <div className="flex-1">
-                  <input
-                    {...register("ageMois", { valueAsNumber: true })}
-                    type="number"
-                    min={0}
-                    max={11}
-                    className={inputCls(false)}
-                    placeholder="Mois"
-                  />
-                </div>
-                <div className="flex-1">
-                  <input
-                    {...register("ageJours", { valueAsNumber: true })}
-                    type="number"
-                    min={0}
-                    max={30}
-                    className={inputCls(false)}
-                    placeholder="Jours"
-                  />
+                <div>
+                  <label className="label">Âge</label>
+                  <div className="grid grid-cols-[1fr_120px]">
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={
+                        ageUnit === "ans" ? (ageAns ?? "") :
+                        ageUnit === "mois" ? (watch("ageMois") ?? "") :
+                        (watch("ageJours") ?? "")
+                      }
+                      onChange={e => {
+                        const val = e.target.value === "" ? undefined : parseFloat(e.target.value)
+                        ageChangedByUser.current = true
+                        dobChangedByUser.current = false
+                        if (ageUnit === "ans") setValue("ageAns", val as number | undefined)
+                        else if (ageUnit === "mois") setValue("ageMois", val as number | undefined)
+                        else setValue("ageJours", val as number | undefined)
+                      }}
+                      className="input w-full rounded-r-none border-r-0 text-base font-medium"
+                      placeholder="0"
+                    />
+                    <select
+                      value={ageUnit}
+                      onChange={e => {
+                        const unit = e.target.value as "ans" | "mois" | "jours"
+                        setAgeUnit(unit)
+                        if (unit !== "ans") setValue("ageAns", undefined)
+                        if (unit !== "mois") setValue("ageMois", undefined)
+                        if (unit !== "jours") setValue("ageJours", undefined)
+                      }}
+                      className="input rounded-l-none border-l border-gray-200 bg-gray-50 text-sm w-full"
+                    >
+                      <option value="ans">Ans</option>
+                      <option value="mois">Mois</option>
+                      <option value="jours">Jours</option>
+                    </select>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1253,7 +1447,14 @@ export default function DeclarationForm({ casId }: { casId?: string } = {}) {
 
             {/* Symptômes codés */}
             <div className="col-span-2">
-              <label className="label">Symptômes codés</label>
+              <label className="label">
+                Symptômes codés
+                {relevantSymptomCategories.length > 0 && (
+                  <span className="ml-2 text-[11px] text-blue-500 font-normal">
+                    (filtrés pour {selectedMaladie?.nomCourt ?? selectedMaladie?.nom})
+                  </span>
+                )}
+              </label>
               {selectedSymptomeIds.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-3">
                   {selectedSymptomeIds.map(id => {

@@ -7,19 +7,20 @@ export async function GET(req: Request) {
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
-  const communeId = searchParams.get("communeId") ?? ""
+  const communeIds = (searchParams.get("communeIds") ?? searchParams.get("communeId") ?? "").split(",").filter(Boolean)
   const days = parseInt(searchParams.get("days") ?? "30")
   const dateDebut = searchParams.get("dateDebut") ?? ""
   const dateFin = searchParams.get("dateFin") ?? ""
-  // Multi-select support: comma-separated IDs
   const maladieIds = (searchParams.get("maladieIds") ?? "").split(",").filter(Boolean)
   const wilayadIds = (searchParams.get("wilayadIds") ?? "").split(",").filter(Boolean)
-  // Legacy single-value support
   const maladieId = searchParams.get("maladieId") ?? ""
   if (maladieId && !maladieIds.includes(maladieId)) maladieIds.push(maladieId)
 
   const since = new Date()
   since.setDate(since.getDate() - days)
+
+  const bucketStart = dateDebut ? new Date(dateDebut) : since
+  const bucketEnd = dateFin ? new Date(dateFin) : new Date()
 
   const dateFilter = (dateDebut || dateFin)
     ? {
@@ -31,24 +32,159 @@ export async function GET(req: Request) {
   const where: Record<string, unknown> = { createdAt: dateFilter }
   if (maladieIds.length === 1) where.maladieId = maladieIds[0]
   else if (maladieIds.length > 1) where.maladieId = { in: maladieIds }
-  if (communeId) where.communeId = communeId
-  // Wilaya filter via commune relation
+  if (communeIds.length === 1) where.communeId = communeIds[0]
+  else if (communeIds.length > 1) where.communeId = { in: communeIds }
   if (wilayadIds.length > 0) {
     where.commune = { wilayadId: { in: wilayadIds } }
   }
 
-  // Stat cards
-  const [totalActifs, totalAlertes, totalMaladies] = await Promise.all([
-    prisma.casDeclare.count({ where: { statut: { in: ["nouveau", "en_cours", "confirme"] } } }),
-    prisma.alerte.count({ where: { statut: "active" } }),
-    prisma.maladie.count({ where: { isActive: true } }),
+  // ── Previous period (same length, shifted back) for evolution KPI ──────────
+  const periodMs = bucketEnd.getTime() - bucketStart.getTime()
+  const prevEnd = new Date(bucketStart.getTime() - 1)
+  const prevStart = new Date(prevEnd.getTime() - periodMs)
+  const prevDateFilter = { gte: prevStart, lte: prevEnd }
+  const prevWhere: Record<string, unknown> = { createdAt: prevDateFilter }
+  if (maladieIds.length === 1) prevWhere.maladieId = maladieIds[0]
+  else if (maladieIds.length > 1) prevWhere.maladieId = { in: maladieIds }
+  if (communeIds.length === 1) prevWhere.communeId = communeIds[0]
+  else if (communeIds.length > 1) prevWhere.communeId = { in: communeIds }
+  if (wilayadIds.length > 0) prevWhere.commune = { wilayadId: { in: wilayadIds } }
+
+  // ── KPI queries ─────────────────────────────────────────────────────────────
+  const [
+    nombreCas,
+    casComplets,
+    casConfirmes,
+    casDeces,
+    casPrevPeriode,
+  ] = await Promise.all([
+    // Total cas (non-brouillon) dans la période filtrée
+    prisma.casDeclare.count({ where: { ...where, statut: { not: "brouillon" } } }),
+    // Cas avec les champs obligatoires remplis
+    prisma.casDeclare.count({
+      where: {
+        ...where,
+        statut: { not: "brouillon" },
+        maladieId: { not: null },
+        communeId: { not: null },
+        dateDiagnostic: { not: null },
+        dateDebutSymptomes: { not: null },
+      },
+    }),
+    // Cas confirmés (dénominateur CFR)
+    prisma.casDeclare.count({ where: { ...where, statut: "confirme" } }),
+    // Décès
+    prisma.casDeclare.count({ where: { ...where, dateDeces: { not: null } } }),
+    // Période précédente (pour évolution)
+    prisma.casDeclare.count({ where: { ...prevWhere, statut: { not: "brouillon" } } }),
   ])
 
-  // Map markers — cases with geolocation
+  const tauxCompletude = nombreCas > 0 ? Math.round((casComplets / nombreCas) * 100) : 0
+  const tauxLethalite = casConfirmes > 0
+    ? parseFloat(((casDeces / casConfirmes) * 100).toFixed(1))
+    : 0
+  const evolutionPct = casPrevPeriode > 0
+    ? Math.round(((nombreCas - casPrevPeriode) / casPrevPeriode) * 100)
+    : nombreCas > 0 ? 100 : 0
+
+  // ── Hotspot (smart wilaya/commune) ──────────────────────────────────────────
+  const topCasByCommune = await prisma.casDeclare.groupBy({
+    by: ["communeId"],
+    where,
+    _count: { id: true },
+    orderBy: { _count: { id: "desc" } },
+    take: 50,
+  })
+
+  const hotspotCommuneIds = topCasByCommune
+    .map(c => c.communeId)
+    .filter((id): id is string => Boolean(id))
+
+  let hotspot: { nom: string; count: number; type: "wilaya" | "commune" } = {
+    nom: "—",
+    count: 0,
+    type: "wilaya",
+  }
+
+  if (hotspotCommuneIds.length > 0) {
+    const showCommune = communeIds.length > 0 || wilayadIds.length === 1
+
+    if (showCommune) {
+      // Afficher la commune avec le plus de cas
+      const topId = hotspotCommuneIds[0]
+      const topCount = topCasByCommune[0]._count.id
+      const commune = await prisma.commune.findUnique({
+        where: { id: topId },
+        select: { nom: true },
+      })
+      hotspot = { nom: commune?.nom ?? "—", count: topCount, type: "commune" }
+    } else {
+      // Agréger par wilaya
+      const communeRefs = await prisma.commune.findMany({
+        where: { id: { in: hotspotCommuneIds } },
+        select: { id: true, wilayadId: true },
+      })
+      const wilayaCountMap: Record<string, number> = {}
+      for (const row of topCasByCommune) {
+        if (!row.communeId) continue
+        const ref = communeRefs.find(c => c.id === row.communeId)
+        if (!ref?.wilayadId) continue
+        wilayaCountMap[ref.wilayadId] = (wilayaCountMap[ref.wilayadId] ?? 0) + row._count.id
+      }
+      const topEntry = Object.entries(wilayaCountMap).sort((a, b) => b[1] - a[1])[0]
+      if (topEntry) {
+        const wilaya = await prisma.wilaya.findUnique({
+          where: { id: topEntry[0] },
+          select: { nom: true },
+        })
+        hotspot = { nom: wilaya?.nom ?? "—", count: topEntry[1], type: "wilaya" }
+      }
+    }
+  }
+
+  // ── Wilaya case counts (for choropleth) ─────────────────────────────────────
+  const casByCommune = await prisma.casDeclare.groupBy({
+    by: ["communeId"],
+    where: { ...where, statut: { not: "brouillon" } },
+    _count: { id: true },
+  })
+  const communeIds2 = casByCommune.map(c => c.communeId).filter((id): id is string => Boolean(id))
+  const communeWilayaMap = communeIds2.length > 0
+    ? await prisma.commune.findMany({
+        where: { id: { in: communeIds2 } },
+        select: { id: true, wilayadId: true },
+      })
+    : []
+  const wilayaCountMap: Record<string, number> = {}
+  for (const row of casByCommune) {
+    if (!row.communeId) continue
+    const ref = communeWilayaMap.find(c => c.id === row.communeId)
+    if (!ref?.wilayadId) continue
+    wilayaCountMap[ref.wilayadId] = (wilayaCountMap[ref.wilayadId] ?? 0) + row._count.id
+  }
+  const wilayaIds3 = Object.keys(wilayaCountMap)
+  const wilayasRef = wilayaIds3.length > 0
+    ? await prisma.wilaya.findMany({
+        where: { id: { in: wilayaIds3 } },
+        select: { id: true, nom: true, code: true },
+      })
+    : []
+  const wilayaStats = wilayasRef.map(w => ({
+    id: w.id,
+    code: w.code,
+    nom: w.nom,
+    count: wilayaCountMap[w.id] ?? 0,
+  })).sort((a, b) => b.count - a.count)
+
+  // ── Map markers ─────────────────────────────────────────────────────────────
   const casGeolocated = await prisma.casDeclare.findMany({
     where: {
       ...where,
-      commune: { latitude: { not: null }, longitude: { not: null } },
+      commune: {
+        ...(wilayadIds.length > 0 ? { wilayadId: { in: wilayadIds } } : {}),
+        latitude: { not: null },
+        longitude: { not: null },
+      },
     },
     include: {
       patient: { select: { firstName: true, lastName: true } },
@@ -70,7 +206,7 @@ export async function GET(req: Request) {
       date: c.createdAt,
     }))
 
-  // Epidemic curve — group by day for last N days
+  // ── Epidemic curve ───────────────────────────────────────────────────────────
   const casByDay = await prisma.casDeclare.groupBy({
     by: ["createdAt"],
     where,
@@ -78,16 +214,12 @@ export async function GET(req: Request) {
     orderBy: { createdAt: "asc" },
   })
 
-  // Build day buckets — adapt to custom date range if provided
-  const bucketStart = dateDebut ? new Date(dateDebut) : since
-  const bucketEnd = dateFin ? new Date(dateFin) : new Date()
   const bucketDays = Math.max(1, Math.ceil((bucketEnd.getTime() - bucketStart.getTime()) / (1000 * 60 * 60 * 24)) + 1)
   const dayMap: Record<string, number> = {}
   for (let i = bucketDays - 1; i >= 0; i--) {
     const d = new Date(bucketEnd)
     d.setDate(d.getDate() - i)
-    const key = d.toISOString().slice(0, 10)
-    dayMap[key] = 0
+    dayMap[d.toISOString().slice(0, 10)] = 0
   }
   casByDay.forEach(row => {
     const key = new Date(row.createdAt).toISOString().slice(0, 10)
@@ -95,7 +227,7 @@ export async function GET(req: Request) {
   })
   const epidemicCurve = Object.entries(dayMap).map(([date, count]) => ({ date, count }))
 
-  // Disease distribution
+  // ── Disease distribution ─────────────────────────────────────────────────────
   const casByMaladie = await prisma.casDeclare.groupBy({
     by: ["maladieId"],
     where,
@@ -114,10 +246,16 @@ export async function GET(req: Request) {
   }))
 
   return NextResponse.json({
-    stats: { totalActifs, totalAlertes, totalMaladies },
+    stats: {
+      nombreCas,
+      tauxCompletude,
+      tauxLethalite,
+      hotspot,
+      evolutionPct,
+    },
     mapMarkers,
+    wilayaStats,
     epidemicCurve,
     diseaseDistribution,
   })
 }
-

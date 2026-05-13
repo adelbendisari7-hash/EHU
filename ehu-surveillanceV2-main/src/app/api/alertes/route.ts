@@ -8,9 +8,23 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url)
   const statut = searchParams.get("statut") ?? ""
+  const maladieId = searchParams.get("maladieId") ?? ""
+  const dateDebut = searchParams.get("dateDebut") ?? ""
+  const dateFin = searchParams.get("dateFin") ?? ""
+
+  const where: Record<string, unknown> = {}
+  if (statut && statut !== "archivee") where.statut = statut as "active" | "resolue"
+  if (!statut) where.statut = { not: "archivee" }
+  if (maladieId) where.maladieId = maladieId
+  if (dateDebut || dateFin) {
+    where.createdAt = {
+      ...(dateDebut ? { gte: new Date(dateDebut) } : {}),
+      ...(dateFin ? { lte: new Date(dateFin + "T23:59:59.999Z") } : {}),
+    }
+  }
 
   const alertes = await prisma.alerte.findMany({
-    where: statut ? { statut: statut as "active" | "resolue" | "archivee" } : undefined,
+    where,
     orderBy: { createdAt: "desc" },
     include: {
       maladie: { select: { nom: true } },

@@ -208,11 +208,9 @@ export async function exportCasPdf(cas: CasPdfData) {
 
   // ── Bande de statut colorée ──
   const statutColors: Record<string, [number, number, number]> = {
-    confirme: [5, 150, 105],
-    infirme:  [220, 38, 38],
-    en_cours: [37, 99, 235],
-    nouveau:  [107, 114, 128],
-    cloture:  [75, 85, 99],
+    confirme: [220, 38, 38],
+    suspect:  [217, 119, 6],
+    brouillon:[107, 114, 128],
   }
   const col = statutColors[cas.statut] ?? EHU_BLUE
   doc.setFillColor(...col)
@@ -220,7 +218,7 @@ export async function exportCasPdf(cas: CasPdfData) {
   doc.setFontSize(8)
   doc.setFont("helvetica", "bold")
   doc.setTextColor(...WHITE)
-  doc.text(`STATUT : ${cas.statut.replace("_", " ").toUpperCase()}  •  CODE CIM-10 : ${cas.codeCim10}  •  DATE DÉCLARATION : ${cas.dateDeclaration}`, 105, y + 5.2, { align: "center" })
+  doc.text(`STATUT : ${cas.statut.toUpperCase()}  •  CODE CIM-10 : ${cas.codeCim10}  •  DATE DÉCLARATION : ${cas.dateDeclaration}`, 105, y + 5.2, { align: "center" })
   y += 12
 
   // ── A. Informations Patient ──
@@ -327,8 +325,9 @@ export async function printCasPdf(cas: CasPdfData) {
   let y = 48
 
   const statutColors: Record<string, [number, number, number]> = {
-    confirme: [5, 150, 105], infirme: [220, 38, 38],
-    en_cours: [37, 99, 235], nouveau: [107, 114, 128], cloture: [75, 85, 99],
+    confirme: [220, 38, 38],
+    suspect:  [217, 119, 6],
+    brouillon:[107, 114, 128],
   }
   const col = statutColors[cas.statut] ?? EHU_BLUE
   doc.setFillColor(...col)
@@ -336,7 +335,7 @@ export async function printCasPdf(cas: CasPdfData) {
   doc.setFontSize(8)
   doc.setFont("helvetica", "bold")
   doc.setTextColor(...WHITE)
-  doc.text(`STATUT : ${cas.statut.replace("_", " ").toUpperCase()}  •  CODE CIM-10 : ${cas.codeCim10}  •  DATE DÉCLARATION : ${cas.dateDeclaration}`, 105, y + 5.2, { align: "center" })
+  doc.text(`STATUT : ${cas.statut.toUpperCase()}  •  CODE CIM-10 : ${cas.codeCim10}  •  DATE DÉCLARATION : ${cas.dateDeclaration}`, 105, y + 5.2, { align: "center" })
   y += 12
 
   doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.setTextColor(...EHU_BLUE)
@@ -426,7 +425,7 @@ export interface AnalyticsPdfData {
 }
 
 const STATUT_LABELS: Record<string, string> = {
-  nouveau: "Nouveau", en_cours: "En cours", confirme: "Confirmé", infirme: "Infirmé", cloture: "Clôturé",
+  brouillon: "Brouillon", suspect: "Suspect", confirme: "Confirmé",
 }
 
 export async function exportAnalysesPdf(data: AnalyticsPdfData) {

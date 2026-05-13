@@ -33,11 +33,11 @@ interface CasResponse {
   totalPages: number
 }
 
-const STATUTS = ["", "confirme", "suspect", "brouillon"]
+const STATUTS = ["", "suspect", "confirme", "brouillon"]
 const STATUT_LABELS: Record<string, string> = {
   "": "Tous",
-  confirme: "Confirmé",
   suspect: "Suspect",
+  confirme: "Confirmé",
   brouillon: "Brouillons",
 }
 
