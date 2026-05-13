@@ -4,9 +4,9 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { signIn } from "next-auth/react"
 import { cn } from "@/utils/cn"
 import { Eye, EyeOff, AlertCircle, Loader2, Shield } from "lucide-react"
-import { loginAction } from "./actions"
 
 const loginSchema = z.object({
   email: z.string().email("Email invalide"),
@@ -31,15 +31,20 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginForm) => {
     setLoading(true)
     setError(null)
-    const formData = new FormData()
-    formData.append("email", data.email)
-    formData.append("password", data.password)
-    const result = await loginAction(formData)
-    if (result.success) {
-      window.location.href = "/dashboard"
-      return
+    try {
+      const result = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      })
+      if (result?.ok) {
+        window.location.href = "/dashboard"
+        return
+      }
+      setError("Email ou mot de passe incorrect.")
+    } catch {
+      setError("Erreur serveur. Veuillez réessayer.")
     }
-    setError(result.error || "Une erreur est survenue.")
     setLoading(false)
   }
 
