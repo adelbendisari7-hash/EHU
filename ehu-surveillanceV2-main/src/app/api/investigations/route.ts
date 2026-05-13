@@ -42,11 +42,8 @@ export async function POST(req: Request) {
     include: { cas: { include: { patient: true, maladie: true } }, contacts: true },
   })
 
-  // Update case status to en_cours
-  await prisma.casDeclare.update({
-    where: { id: body.casId },
-    data: { statut: "en_cours" },
-  })
+  // Keep case status as-is when investigation is created
+
 
   return NextResponse.json(investigation, { status: 201 })
 }
