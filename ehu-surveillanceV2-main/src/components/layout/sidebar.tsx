@@ -126,7 +126,7 @@ function SidebarFooter({ userName, userRole }: { userName: string; userRole: str
   return (
     <div className="p-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
       <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg transition-colors cursor-default" style={{ }}>
-        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 ring-2" style={{ backgroundColor: "rgba(255,255,255,0.18)", ringColor: "rgba(255,255,255,0.12)" }}>
+        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 ring-2 ring-white/10" style={{ backgroundColor: "rgba(255,255,255,0.18)" }}>
           <span className="text-white text-[13px] font-semibold">
             {userName.charAt(0).toUpperCase()}
           </span>
