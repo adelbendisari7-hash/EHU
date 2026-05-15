@@ -17,7 +17,6 @@ const ICONS: Record<string, React.ElementType> = {
   BarChart, AlertTriangle, Users, Settings, Shield, FileBarChart, TrendingUp, History, Bell, Activity, LayoutTemplate,
 }
 
-// Group nav items for visual hierarchy
 const NAV_GROUPS: Record<string, string[]> = {
   Principal: ["/dashboard"],
   Déclarations: ["/declarations/new", "/declarations"],
@@ -36,8 +35,6 @@ function NavLinks({
   pathname: string
   onNavigate?: () => void
 }) {
-  const visibleHrefs = new Set(visibleItems.map(i => i.href))
-
   return (
     <nav className="flex-1 overflow-y-auto py-3 px-3">
       {Object.entries(NAV_GROUPS).map(([group, hrefs]) => {
@@ -47,8 +44,8 @@ function NavLinks({
         if (groupItems.length === 0) return null
 
         return (
-          <div key={group} className="mb-1">
-            <p className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/40 select-none">
+          <div key={group} className="mb-2">
+            <p className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.07em] select-none" style={{ color: "rgba(255,255,255,0.52)" }}>
               {group}
             </p>
             <ul className="space-y-0.5">
@@ -62,11 +59,12 @@ function NavLinks({
                         href={item.href}
                         onClick={onNavigate}
                         className={cn(
-                          "group flex items-center gap-2 px-3 py-1.5 rounded-lg text-[12px] transition-all relative border-l border-white/15 ml-1",
+                          "group flex items-center gap-2 px-3 py-1.5 rounded-md text-[13px] transition-all relative border-l border-white/20 ml-1",
                           isActive
-                            ? "text-white font-medium bg-white/10"
-                            : "text-white/50 hover:bg-white/8 hover:text-white/80"
+                            ? "font-medium bg-white/12"
+                            : "hover:bg-white/8"
                         )}
+                        style={{ color: isActive ? "#fff" : "rgba(255,255,255,0.72)" }}
                       >
                         {Icon && <Icon size={13} className="shrink-0" />}
                         <span className="truncate">{item.label}</span>
@@ -80,14 +78,15 @@ function NavLinks({
                       href={item.href}
                       onClick={onNavigate}
                       className={cn(
-                        "group flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] transition-all relative",
+                        "group flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[14px] transition-all relative",
                         isActive
-                          ? "bg-white/15 text-white font-medium shadow-sm"
-                          : "text-white/65 hover:bg-white/8 hover:text-white/90"
+                          ? "bg-white/16 font-semibold shadow-sm"
+                          : "hover:bg-white/10"
                       )}
+                      style={{ color: isActive ? "#fff" : "rgba(255,255,255,0.78)" }}
                     >
                       {isActive && (
-                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r-full bg-white" />
+                        <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-white" />
                       )}
                       {Icon && <Icon size={16} className="shrink-0" />}
                       <span className="truncate">{item.label}</span>
@@ -105,13 +104,13 @@ function NavLinks({
 
 function SidebarLogo() {
   return (
-    <div className="flex items-center gap-3 px-5 h-14 border-b border-white/8 shrink-0">
-      <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center shrink-0 shadow-sm">
-        <span className="font-bold text-xs" style={{ color: "#1B4F8A" }}>EHU</span>
+    <div className="flex items-center gap-3 px-5 h-16 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md" style={{ backgroundColor: "rgba(255,255,255,0.95)" }}>
+        <span className="font-bold text-[11px] tracking-tight" style={{ color: "#1B4F8A" }}>EHU</span>
       </div>
       <div className="min-w-0">
-        <p className="text-white font-semibold text-sm leading-none">EHU Oran</p>
-        <p className="text-white/45 text-[11px] mt-0.5 truncate">Surveillance Épidémiologique</p>
+        <p className="text-white font-semibold text-[14px] leading-tight">EHU Oran</p>
+        <p className="text-[11px] mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.58)" }}>Surveillance Épidémiologique</p>
       </div>
     </div>
   )
@@ -125,21 +124,22 @@ function SidebarFooter({ userName, userRole }: { userName: string; userRole: str
   }
 
   return (
-    <div className="border-t border-white/8 p-3 shrink-0">
-      <div className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-white/5 transition-colors cursor-default">
-        <div className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center shrink-0 ring-2 ring-white/10">
-          <span className="text-white text-xs font-semibold">
+    <div className="p-3 shrink-0" style={{ borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+      <div className="flex items-center gap-2.5 px-2 py-2 rounded-lg transition-colors cursor-default" style={{ }}>
+        <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 ring-2" style={{ backgroundColor: "rgba(255,255,255,0.18)", ringColor: "rgba(255,255,255,0.12)" }}>
+          <span className="text-white text-[13px] font-semibold">
             {userName.charAt(0).toUpperCase()}
           </span>
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-white text-[13px] font-medium truncate leading-none">{userName}</p>
-          <p className="text-white/45 text-[11px] mt-0.5">{roleLabels[userRole] ?? userRole}</p>
+          <p className="text-white text-[14px] font-medium truncate leading-tight">{userName}</p>
+          <p className="text-[12px] mt-0.5" style={{ color: "rgba(255,255,255,0.60)" }}>{roleLabels[userRole] ?? userRole}</p>
         </div>
       </div>
       <button
         onClick={() => signOut({ callbackUrl: "/login" })}
-        className="flex items-center gap-2 w-full px-3 py-2 mt-1 rounded-lg text-white/50 hover:text-white hover:bg-white/8 text-[13px] transition-all"
+        className="flex items-center gap-2 w-full px-3 py-2 mt-1 rounded-lg text-[13px] transition-all hover:bg-white/10"
+        style={{ color: "rgba(255,255,255,0.68)" }}
       >
         <LogOut size={15} />
         <span>Déconnexion</span>
@@ -179,7 +179,7 @@ export default function Sidebar({ userName, userRole, permissions }: SidebarProp
       {/* Mobile hamburger */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-3.5 left-3.5 z-50 p-2 rounded-lg text-white shadow-md"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 rounded-lg text-white shadow-md"
         style={{ backgroundColor: "#1B4F8A" }}
         aria-label="Ouvrir le menu"
       >
@@ -189,7 +189,8 @@ export default function Sidebar({ userName, userRole, permissions }: SidebarProp
       {/* Mobile overlay */}
       {mobileOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/40 backdrop-blur-sm z-40 transition-opacity"
+          className="lg:hidden fixed inset-0 backdrop-blur-sm z-40 transition-opacity"
+          style={{ backgroundColor: "rgba(0,0,0,0.55)" }}
           onClick={() => setMobileOpen(false)}
         />
       )}
@@ -200,11 +201,12 @@ export default function Sidebar({ userName, userRole, permissions }: SidebarProp
           "lg:hidden fixed left-0 top-0 h-full w-64 flex flex-col z-50 transition-transform duration-300",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
-        style={{ backgroundColor: "#142D4F" }}
+        style={{ backgroundColor: "#132B4A" }}
       >
         <button
           onClick={() => setMobileOpen(false)}
-          className="absolute top-3.5 right-3.5 text-white/50 hover:text-white p-1"
+          className="absolute top-4 right-4 p-1 rounded-md transition-colors hover:bg-white/10"
+          style={{ color: "rgba(255,255,255,0.65)" }}
           aria-label="Fermer le menu"
         >
           <X size={18} />
@@ -215,7 +217,7 @@ export default function Sidebar({ userName, userRole, permissions }: SidebarProp
       {/* Desktop sidebar */}
       <aside
         className="hidden lg:flex fixed left-0 top-0 h-full w-64 flex-col z-30"
-        style={{ backgroundColor: "#142D4F" }}
+        style={{ backgroundColor: "#132B4A" }}
       >
         {sidebarContent}
       </aside>

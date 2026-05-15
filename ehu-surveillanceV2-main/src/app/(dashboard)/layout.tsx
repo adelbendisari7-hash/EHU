@@ -20,7 +20,7 @@ export default async function DashboardLayout({
     <div className="min-h-screen" style={{ backgroundColor: "var(--gray-50)" }}>
       <Sidebar userName={userName} userRole={userRole} permissions={permissions} />
       <Topbar userName={userName} />
-      <main className="pt-14 min-h-screen lg:ml-64">
+      <main className="pt-16 min-h-screen lg:ml-64">
         <div className="p-4 lg:p-6 animate-fade-in-up">{children}</div>
       </main>
       <Toaster
@@ -28,7 +28,7 @@ export default async function DashboardLayout({
         expand={false}
         richColors
         toastOptions={{
-          style: { fontFamily: "system-ui, -apple-system, sans-serif", fontSize: "14px" },
+          style: { fontFamily: "var(--font-sans), 'IBM Plex Sans', system-ui, sans-serif", fontSize: "14px" },
           duration: 4000,
         }}
       />

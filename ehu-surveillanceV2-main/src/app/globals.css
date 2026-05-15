@@ -2,7 +2,8 @@
 
 /* =============================================================================
    DESIGN SYSTEM — EHU Oran Surveillance
-   Influenced by Linear, Vercel, Stripe. Clean, clinical, trustworthy.
+   Polices : IBM Plex Sans (enterprise, lisible, adapté au personnel médical)
+   Palette : bleu institutionnel #1B4F8A + neutres chauds
    ============================================================================= */
 
 :root {
@@ -18,16 +19,16 @@
   --brand-800: #0B213B;
   --brand-900: #061525;
 
-  /* ── Neutral Scale ── */
-  --gray-50:  #F8F9FB;
-  --gray-100: #F1F3F5;
-  --gray-200: #E5E7EB;
-  --gray-300: #D1D5DB;
-  --gray-400: #9CA3AF;
-  --gray-500: #6B7280;
-  --gray-600: #4B5563;
-  --gray-700: #374151;
-  --gray-800: #1F2937;
+  /* ── Neutral Scale (légèrement bleutée pour cohérence avec la marque) ── */
+  --gray-50:  #F2F5F9;
+  --gray-100: #E8EDF4;
+  --gray-200: #D8DFE9;
+  --gray-300: #C4CDD9;
+  --gray-400: #8E9BB0;
+  --gray-500: #637083;
+  --gray-600: #475566;
+  --gray-700: #333E50;
+  --gray-800: #1E2A38;
   --gray-900: #111827;
 
   /* ── Semantic Colors ── */
@@ -40,13 +41,13 @@
   --info: #2563EB;
   --info-light: #EFF6FF;
 
-  /* ── Shadow Scale (consistent depth) ── */
-  --shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
-  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.04);
-  --shadow-xl: 0 20px 25px -5px rgba(0,0,0,0.08), 0 10px 10px -5px rgba(0,0,0,0.03);
-  --shadow-focus: 0 0 0 3px rgba(27, 79, 138, 0.15);
+  /* ── Shadow Scale ── */
+  --shadow-xs: 0 1px 2px rgba(17, 24, 55, 0.05);
+  --shadow-sm: 0 1px 3px rgba(17, 24, 55, 0.07), 0 1px 2px rgba(17, 24, 55, 0.04);
+  --shadow-md: 0 4px 8px -1px rgba(17, 24, 55, 0.08), 0 2px 4px -1px rgba(17, 24, 55, 0.05);
+  --shadow-lg: 0 10px 18px -3px rgba(17, 24, 55, 0.09), 0 4px 8px -2px rgba(17, 24, 55, 0.05);
+  --shadow-xl: 0 20px 28px -5px rgba(17, 24, 55, 0.09), 0 10px 12px -5px rgba(17, 24, 55, 0.04);
+  --shadow-focus: 0 0 0 3px rgba(27, 79, 138, 0.18);
 
   /* ── Radius Scale ── */
   --radius-sm: 6px;
@@ -67,20 +68,24 @@
 * { box-sizing: border-box; }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans), 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
   background-color: var(--gray-50);
   color: var(--gray-900);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "kern" 1, "liga" 1;
 }
 
 /* =============================================================================
-   FORM INPUTS — Unified input system
+   FORM INPUTS — Système unifié, lisible pour tous les profils d'utilisateurs
    ============================================================================= */
 .input {
-  height: 38px;
-  padding: 0 12px;
-  font-size: 13px;
+  height: 40px;
+  padding: 0 13px;
+  font-size: 14px;
+  font-family: inherit;
   line-height: 1.5;
   color: var(--gray-900);
   background-color: #fff;
@@ -122,27 +127,27 @@ body {
 select.input {
   appearance: none;
   cursor: pointer;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M5 7L1 3h8z' fill='%236B7280'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 10 10'%3E%3Cpath d='M5 7L1 3h8z' fill='%238E9BB0'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 12px center;
-  padding-right: 32px;
+  background-position: right 13px center;
+  padding-right: 34px;
 }
 
 textarea.input {
   height: auto;
-  padding: 10px 12px;
+  padding: 10px 13px;
   resize: vertical;
-  min-height: 72px;
+  min-height: 80px;
   line-height: 1.6;
 }
 
 /* ── Label ── */
 .label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
-  color: var(--gray-600);
-  margin-bottom: 4px;
+  color: var(--gray-700);
+  margin-bottom: 5px;
   letter-spacing: 0.01em;
 }
 
@@ -152,13 +157,13 @@ textarea.input {
 }
 
 /* =============================================================================
-   CARD — Unified card system
+   CARD — Cartes unifiées avec profondeur subtile
    ============================================================================= */
 .card {
   background-color: #fff;
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xs);
+  box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
 
@@ -168,7 +173,7 @@ textarea.input {
 }
 
 .card-title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--gray-800);
   letter-spacing: -0.01em;
@@ -198,11 +203,12 @@ textarea.input {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
+  font-family: inherit;
   font-weight: 500;
   line-height: 1;
-  padding: 0 14px;
-  height: 36px;
+  padding: 0 16px;
+  height: 38px;
   border-radius: var(--radius-md);
   border: 1px solid transparent;
   cursor: pointer;
@@ -227,7 +233,7 @@ textarea.input {
 }
 .btn-primary:hover:not(:disabled) {
   background-color: var(--brand-600);
-  box-shadow: 0 1px 3px rgba(27, 79, 138, 0.25);
+  box-shadow: 0 2px 6px rgba(27, 79, 138, 0.28);
 }
 
 .btn-success {
@@ -236,7 +242,7 @@ textarea.input {
 }
 .btn-success:hover:not(:disabled) {
   background-color: #047857;
-  box-shadow: 0 1px 3px rgba(5, 150, 105, 0.25);
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
 }
 
 .btn-danger {
@@ -267,40 +273,40 @@ textarea.input {
 }
 
 .btn-sm {
-  height: 30px;
-  padding: 0 10px;
-  font-size: 12px;
+  height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
   border-radius: var(--radius-sm);
 }
 
 .btn-lg {
-  height: 42px;
-  padding: 0 20px;
-  font-size: 14px;
+  height: 44px;
+  padding: 0 22px;
+  font-size: 15px;
   font-weight: 600;
 }
 
 /* =============================================================================
-   BADGE — Status indicators
+   BADGE — Indicateurs de statut
    ============================================================================= */
 .badge {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 8px;
-  font-size: 11px;
+  padding: 3px 9px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 18px;
   border-radius: var(--radius-full);
-  letter-spacing: 0.02em;
+  letter-spacing: 0.01em;
   white-space: nowrap;
 }
 
 /* =============================================================================
-   PAGE HEADER — Consistent page titles
+   PAGE HEADER — Titres de pages cohérents
    ============================================================================= */
 .page-title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: var(--gray-900);
   letter-spacing: -0.025em;
@@ -308,13 +314,13 @@ textarea.input {
 }
 
 .page-subtitle {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--gray-500);
-  margin-top: 2px;
+  margin-top: 3px;
 }
 
 /* =============================================================================
-   TABLE — Clean data tables
+   TABLE — Tables de données lisibles
    ============================================================================= */
 .table-header {
   background-color: var(--gray-50);
@@ -322,9 +328,9 @@ textarea.input {
 }
 
 .table-header th {
-  padding: 10px 16px;
+  padding: 11px 16px;
   text-align: left;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--gray-500);
   text-transform: uppercase;
@@ -341,8 +347,8 @@ textarea.input {
 }
 
 .table-row td {
-  padding: 12px 16px;
-  font-size: 13px;
+  padding: 13px 16px;
+  font-size: 14px;
   color: var(--gray-700);
 }
 
@@ -401,7 +407,7 @@ textarea.input {
 .animate-spinner { animation: spin 0.6s linear infinite; }
 
 /* =============================================================================
-   INTERACTIVE — Global transition defaults
+   INTERACTIVE — Transitions globales
    ============================================================================= */
 button, a, [role="button"] {
   transition: all var(--duration-fast) var(--ease-out);
@@ -423,7 +429,7 @@ button:active:not(:disabled) {
    UTILITIES
    ============================================================================= */
 .text-mono {
-  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-family: 'IBM Plex Mono', 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
   font-feature-settings: "liga" 0;
 }
 

@@ -65,7 +65,7 @@ function StatCard({
       <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full" style={{ backgroundColor: color }} />
 
       <div className="flex items-start justify-between mb-4 pl-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-400">{label}</p>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.05em] text-gray-400">{label}</p>
         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: bgColor }}>
           <Icon size={15} style={{ color }} />
         </div>
@@ -78,7 +78,7 @@ function StatCard({
             <span className="ml-2 inline-flex w-1.5 h-1.5 rounded-full badge-pulse align-middle mb-1" style={{ backgroundColor: color }} />
           )}
         </p>
-        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">{sub}</p>
+        <p className="text-[12px] text-gray-400 mt-1 leading-relaxed">{sub}</p>
       </div>
     </div>
   )
@@ -116,7 +116,7 @@ function EvolutionCard({
       <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full" style={{ backgroundColor: color }} />
 
       <div className="flex items-start justify-between mb-4 pl-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-400">Évolution</p>
+        <p className="text-[12px] font-semibold uppercase tracking-[0.05em] text-gray-400">Évolution</p>
         <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: bgColor }}>
           <Icon size={15} style={{ color }} />
         </div>
@@ -126,7 +126,7 @@ function EvolutionCard({
         <p className="text-2xl font-bold counter-in tracking-tight" style={{ color }}>
           {isNeutral ? "0%" : `${sign}${animated}%`}
         </p>
-        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">{sub}</p>
+        <p className="text-[12px] text-gray-400 mt-1 leading-relaxed">{sub}</p>
       </div>
     </div>
   )

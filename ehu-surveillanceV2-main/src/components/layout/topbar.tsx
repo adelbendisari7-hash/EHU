@@ -2,22 +2,22 @@
 
 import { usePathname } from "next/navigation"
 import Link from "next/link"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, Home } from "lucide-react"
 import NotificationBell from "@/components/notifications/notification-bell"
 
 const BREADCRUMBS: Record<string, { label: string; parent?: string }> = {
-  "/dashboard": { label: "Dashboard" },
+  "/dashboard": { label: "Tableau de bord" },
   "/declarations": { label: "Déclarations" },
   "/declarations/new": { label: "Nouvelle Déclaration", parent: "/declarations" },
   "/investigations": { label: "Investigations" },
-  "/analyses": { label: "Analyses" },
-  "/alertes": { label: "Alertes" },
+  "/analyses": { label: "Analyses & Statistiques" },
+  "/alertes": { label: "Alertes Épidémiques" },
   "/predictions": { label: "Prédictions", parent: "/analyses" },
   "/utilisateurs": { label: "Utilisateurs" },
   "/parametres": { label: "Paramètres" },
   "/profil": { label: "Mon Profil" },
   "/rapports": { label: "Rapports" },
-  "/parametres/historique": { label: "Historique Activités", parent: "/parametres" },
+  "/parametres/historique": { label: "Historique des Activités", parent: "/parametres" },
   "/notifications": { label: "Notifications" },
   "/mes-stats": { label: "Mes Statistiques" },
   "/rapports/modeles": { label: "Modèles de Rapports", parent: "/rapports" },
@@ -25,7 +25,7 @@ const BREADCRUMBS: Record<string, { label: string; parent?: string }> = {
 
 function Breadcrumb({ pathname }: { pathname: string }) {
   const current = BREADCRUMBS[pathname]
-  if (!current) return <span className="text-sm font-medium text-gray-800">EHU Surveillance</span>
+  if (!current) return <span className="text-[14px] font-semibold" style={{ color: "var(--gray-800)" }}>EHU Surveillance</span>
 
   const crumbs: { label: string; href?: string }[] = []
   if (current.parent) {
@@ -38,13 +38,21 @@ function Breadcrumb({ pathname }: { pathname: string }) {
     <div className="flex items-center gap-1.5">
       {crumbs.map((crumb, i) => (
         <span key={i} className="flex items-center gap-1.5">
-          {i > 0 && <ChevronRight size={12} className="text-gray-400" />}
+          {i > 0 && <ChevronRight size={13} style={{ color: "var(--gray-400)" }} />}
           {crumb.href ? (
-            <Link href={crumb.href} className="text-[13px] text-gray-400 transition-colors hover:text-gray-600">
+            <Link
+              href={crumb.href}
+              className="text-[13px] font-medium transition-colors"
+              style={{ color: "var(--gray-400)" }}
+              onMouseOver={e => (e.currentTarget.style.color = "var(--gray-600)")}
+              onMouseOut={e => (e.currentTarget.style.color = "var(--gray-400)")}
+            >
               {crumb.label}
             </Link>
           ) : (
-            <span className="text-[13px] font-medium text-gray-800">{crumb.label}</span>
+            <span className="text-[14px] font-semibold" style={{ color: "var(--gray-800)" }}>
+              {crumb.label}
+            </span>
           )}
         </span>
       ))}
@@ -61,7 +69,12 @@ export default function Topbar({ userName }: TopbarProps) {
 
   return (
     <header
-      className="fixed top-0 right-0 h-14 bg-white/88 backdrop-blur-md border-b border-gray-200 flex items-center justify-between px-4 lg:px-6 z-20 left-0 lg:left-64"
+      className="fixed top-0 right-0 h-16 flex items-center justify-between px-4 lg:px-6 z-20 left-0 lg:left-64"
+      style={{
+        backgroundColor: "#ffffff",
+        borderBottom: "1px solid var(--gray-200)",
+        boxShadow: "0 1px 3px rgba(17, 24, 55, 0.05)",
+      }}
     >
       <div className="pl-12 lg:pl-0">
         <Breadcrumb pathname={pathname} />
@@ -70,16 +83,24 @@ export default function Topbar({ userName }: TopbarProps) {
       <div className="flex items-center gap-2">
         <NotificationBell />
 
-        <div className="w-px h-5 mx-1 bg-gray-200" />
+        <div className="w-px h-5 mx-1" style={{ backgroundColor: "var(--gray-200)" }} />
 
         <Link
           href="/profil"
-          className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors"
+          className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors"
+          style={{ color: "var(--gray-700)" }}
+          onMouseOver={e => (e.currentTarget.style.backgroundColor = "var(--gray-50)")}
+          onMouseOut={e => (e.currentTarget.style.backgroundColor = "transparent")}
         >
-          <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-[11px] font-semibold" style={{ backgroundColor: "#1B4F8A" }}>
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[12px] font-bold shrink-0"
+            style={{ backgroundColor: "#1B4F8A" }}
+          >
             {userName.charAt(0).toUpperCase()}
           </div>
-          <span className="text-[13px] font-medium text-gray-700 hidden sm:block">{userName}</span>
+          <span className="text-[14px] font-medium hidden sm:block" style={{ color: "var(--gray-700)" }}>
+            {userName}
+          </span>
         </Link>
       </div>
     </header>
