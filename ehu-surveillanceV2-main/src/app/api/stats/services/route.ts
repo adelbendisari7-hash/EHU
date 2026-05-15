@@ -6,11 +6,9 @@ export async function GET() {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
 
-  const rows = await prisma.casDeclare.findMany({
+  const rows = await prisma.casDeclare.groupBy({
+    by: ["serviceDeclarant"],
     where: { serviceDeclarant: { not: null } },
-    select: { serviceDeclarant: true },
-    distinct: ["serviceDeclarant"],
-    orderBy: { serviceDeclarant: "asc" },
   })
 
   const services = rows
