@@ -13,6 +13,7 @@ export async function GET(req: Request) {
   const dateFin = searchParams.get("dateFin") ?? ""
   const maladieIds = (searchParams.get("maladieIds") ?? "").split(",").filter(Boolean)
   const wilayadIds = (searchParams.get("wilayadIds") ?? "").split(",").filter(Boolean)
+  const services = (searchParams.get("services") ?? "").split(",").filter(Boolean)
   const maladieId = searchParams.get("maladieId") ?? ""
   if (maladieId && !maladieIds.includes(maladieId)) maladieIds.push(maladieId)
 
@@ -37,6 +38,8 @@ export async function GET(req: Request) {
   if (wilayadIds.length > 0) {
     where.commune = { wilayadId: { in: wilayadIds } }
   }
+  if (services.length === 1) where.serviceDeclarant = services[0]
+  else if (services.length > 1) where.serviceDeclarant = { in: services }
 
   // ── Previous period (same length, shifted back) for evolution KPI ──────────
   const periodMs = bucketEnd.getTime() - bucketStart.getTime()
@@ -49,6 +52,8 @@ export async function GET(req: Request) {
   if (communeIds.length === 1) prevWhere.communeId = communeIds[0]
   else if (communeIds.length > 1) prevWhere.communeId = { in: communeIds }
   if (wilayadIds.length > 0) prevWhere.commune = { wilayadId: { in: wilayadIds } }
+  if (services.length === 1) prevWhere.serviceDeclarant = services[0]
+  else if (services.length > 1) prevWhere.serviceDeclarant = { in: services }
 
   // ── KPI queries ─────────────────────────────────────────────────────────────
   const [

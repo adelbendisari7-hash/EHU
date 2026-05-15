@@ -17,12 +17,14 @@ export interface DashboardFiltersState {
   maladieIds: string[]
   wilayadIds: string[]
   communeIds: string[]
+  services: string[]
 }
 
 interface Props {
   maladies: Maladie[]
   communes: Commune[]
   wilayas: Wilaya[]
+  services: string[]
   filters: DashboardFiltersState
   onChange: (filters: DashboardFiltersState) => void
 }
@@ -157,7 +159,7 @@ function MultiSelect({
   )
 }
 
-export default function DashboardFilters({ maladies, communes, wilayas, filters, onChange }: Props) {
+export default function DashboardFilters({ maladies, communes, wilayas, services, filters, onChange }: Props) {
   const [showDateRange, setShowDateRange] = useState(
     !!(filters.dateDebut || filters.dateFin)
   )
@@ -270,6 +272,17 @@ export default function DashboardFilters({ maladies, communes, wilayas, filters,
         placeholder="Toutes maladies"
         width="min-w-[150px]"
       />
+
+      {/* Services multi-select */}
+      {services.length > 0 && (
+        <MultiSelect
+          options={services.map(s => ({ value: s, label: s }))}
+          selected={filters.services}
+          onChange={svcs => onChange({ ...filters, services: svcs })}
+          placeholder="Tous services"
+          width="min-w-[150px]"
+        />
+      )}
     </div>
   )
 }

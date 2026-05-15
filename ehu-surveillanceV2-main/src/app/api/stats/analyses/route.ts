@@ -19,6 +19,7 @@ export async function GET(req: Request) {
   const communeIds = (searchParams.get("communeIds") ?? searchParams.get("communeId") ?? "").split(",").filter(Boolean)
   const wilayadIdsParam = searchParams.get("wilayadIds") ?? ""
   const wilayadIds = wilayadIdsParam ? wilayadIdsParam.split(",").filter(Boolean) : []
+  const services = (searchParams.get("services") ?? "").split(",").filter(Boolean)
 
   const where: Record<string, unknown> = {}
 
@@ -49,6 +50,8 @@ export async function GET(req: Request) {
   } else if (wilayadIds.length > 0) {
     where.commune = { wilayadId: { in: wilayadIds } }
   }
+  if (services.length === 1) where.serviceDeclarant = services[0]
+  else if (services.length > 1) where.serviceDeclarant = { in: services }
 
   // Cases by disease (prevalence)
   const byMaladie = await prisma.casDeclare.groupBy({

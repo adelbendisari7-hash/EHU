@@ -43,6 +43,7 @@ export default function AnalysesPage() {
   const [maladies, setMaladies] = useState<RefItem[]>([])
   const [wilayas, setWilayas] = useState<WilayaItem[]>([])
   const [communes, setCommunes] = useState<CommuneItem[]>([])
+  const [availableServices, setAvailableServices] = useState<string[]>([])
   const [filters, setFilters] = useState<DashboardFiltersState>({
     days: "90",
     dateDebut: "",
@@ -50,6 +51,7 @@ export default function AnalysesPage() {
     maladieIds: [],
     wilayadIds: [],
     communeIds: [],
+    services: [],
   })
 
   const fetchData = useCallback(async () => {
@@ -64,6 +66,7 @@ export default function AnalysesPage() {
     if (filters.maladieIds.length > 0) params.set("maladieIds", filters.maladieIds.join(","))
     if (filters.wilayadIds.length > 0) params.set("wilayadIds", filters.wilayadIds.join(","))
     if (filters.communeIds.length > 0) params.set("communeIds", filters.communeIds.join(","))
+    if (filters.services.length > 0) params.set("services", filters.services.join(","))
     const res = await fetch(`/api/stats/analyses?${params}`)
     setData(await res.json())
     setLoading(false)
@@ -75,6 +78,7 @@ export default function AnalysesPage() {
     fetch("/api/maladies").then(r => r.json()).then(d => setMaladies(d.maladies ?? d)).catch(console.error)
     fetch("/api/wilayas").then(r => r.json()).then((d: WilayaItem[]) => setWilayas(d)).catch(console.error)
     fetch("/api/communes").then(r => r.json()).then((d: CommuneItem[]) => setCommunes(d)).catch(console.error)
+    fetch("/api/stats/services").then(r => r.json()).then((d: string[]) => setAvailableServices(d)).catch(console.error)
   }, [])
 
   return (
@@ -94,6 +98,7 @@ export default function AnalysesPage() {
           maladies={maladies}
           communes={communes as { id: string; nom: string; wilayadId?: string }[]}
           wilayas={wilayas}
+          services={availableServices}
           filters={filters}
           onChange={setFilters}
         />

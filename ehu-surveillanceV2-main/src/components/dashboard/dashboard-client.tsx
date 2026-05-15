@@ -51,10 +51,16 @@ export default function DashboardClient({ maladies, communes, wilayas, userName 
     maladieIds: [],
     wilayadIds: [],
     communeIds: [],
+    services: [],
   })
   const [data, setData] = useState<DashboardData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(false)
+  const [availableServices, setAvailableServices] = useState<string[]>([])
+
+  useEffect(() => {
+    fetch("/api/stats/services").then(r => r.json()).then((d: string[]) => setAvailableServices(d)).catch(() => {})
+  }, [])
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -66,6 +72,7 @@ export default function DashboardClient({ maladies, communes, wilayas, userName 
       if (filters.communeIds.length > 0) params.set("communeIds", filters.communeIds.join(","))
       if (filters.maladieIds.length > 0) params.set("maladieIds", filters.maladieIds.join(","))
       if (filters.wilayadIds.length > 0) params.set("wilayadIds", filters.wilayadIds.join(","))
+      if (filters.services.length > 0) params.set("services", filters.services.join(","))
       const res = await fetch(`/api/stats/dashboard?${params}`)
       if (!res.ok) throw new Error()
       const json = await res.json()
@@ -91,6 +98,7 @@ export default function DashboardClient({ maladies, communes, wilayas, userName 
           maladies={maladies}
           communes={communes}
           wilayas={wilayas}
+          services={availableServices}
           filters={filters}
           onChange={setFilters}
         />

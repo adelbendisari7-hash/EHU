@@ -10,6 +10,7 @@ export async function GET(req: Request) {
   const communeIds = (searchParams.get("communeIds") ?? "").split(",").filter(Boolean)
   const maladieIds = (searchParams.get("maladieIds") ?? "").split(",").filter(Boolean)
   const wilayadIds = (searchParams.get("wilayadIds") ?? "").split(",").filter(Boolean)
+  const services = (searchParams.get("services") ?? "").split(",").filter(Boolean)
 
   // Always fetch 90 days — algorithms need enough history
   const since = new Date()
@@ -24,6 +25,8 @@ export async function GET(req: Request) {
   if (communeIds.length === 1) where.communeId = communeIds[0]
   else if (communeIds.length > 1) where.communeId = { in: communeIds }
   if (wilayadIds.length > 0) where.commune = { wilayadId: { in: wilayadIds } }
+  if (services.length === 1) where.serviceDeclarant = services[0]
+  else if (services.length > 1) where.serviceDeclarant = { in: services }
 
   const casByDay = await prisma.casDeclare.groupBy({
     by: ["createdAt"],
@@ -68,6 +71,8 @@ export async function GET(req: Request) {
   } else if (communeIds.length > 1) {
     parts.push(`${communeIds.length} communes`)
   }
+  if (services.length === 1) parts.push(`Service ${services[0]}`)
+  else if (services.length > 1) parts.push(`${services.length} services`)
   if (parts.length > 0) contextLabel = parts.join(" · ")
 
   return NextResponse.json({ series, contextLabel })
