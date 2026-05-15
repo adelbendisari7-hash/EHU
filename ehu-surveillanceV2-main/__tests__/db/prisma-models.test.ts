@@ -80,10 +80,10 @@ describe("Germe Model", () => {
     expect(new Set(codes).size).toBe(codes.length)
   })
 
-  it("SALMONELLA_TYPHI germe exists", async () => {
-    const salmonella = await prisma.germe.findUnique({ where: { code: "SALMONELLA_TYPHI" } })
-    expect(salmonella).toBeTruthy()
-    expect(salmonella!.type).toBe("bacterie")
+  it("SARM germe exists", async () => {
+    const sarm = await prisma.germe.findUnique({ where: { nom: "Staphylococcus aureus résistant à la méticilline (SARM/MRSA)" } })
+    expect(sarm).toBeTruthy()
+    expect(sarm!.type).toBe("bacterie")
   })
 })
 
@@ -215,7 +215,7 @@ describe("CasDeclare Model — Create and Read", () => {
         dateDebutSymptomes: new Date("2024-03-01"),
         dateDiagnostic: new Date("2024-03-05"),
         service: "Test Service",
-        statut: "nouveau",
+        statut: "suspect",
         // Phase E fields
         nationaliteCode: "DZ",
         evaluationClinique: { notes: "Test evaluation" },
@@ -318,7 +318,7 @@ describe("CasDeclare Model — Create and Read", () => {
   it("can update case status", async () => {
     const updated = await prisma.casDeclare.update({
       where: { id: testCasId },
-      data: { statut: "en_cours" },
+      data: { statut: "confirme" },
     })
     expect(updated.statut).toBe("en_cours")
   })
@@ -390,7 +390,7 @@ describe("Self-referencing CasSimilaire FK", () => {
         dateDebutSymptomes: new Date(),
         dateDiagnostic: new Date(),
         service: "Test",
-        statut: "nouveau",
+        statut: "suspect",
       },
     })
     cleanup.push({ model: "casDeclare", id: casA.id })
@@ -403,7 +403,7 @@ describe("Self-referencing CasSimilaire FK", () => {
         dateDebutSymptomes: new Date(),
         dateDiagnostic: new Date(),
         service: "Test",
-        statut: "nouveau",
+        statut: "suspect",
         casSimilaireId: casA.id,
       },
     })

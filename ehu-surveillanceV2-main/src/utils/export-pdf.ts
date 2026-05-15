@@ -415,7 +415,7 @@ export async function printCasPdf(cas: CasPdfData) {
 
 // ---------- Analytics / Rapport mensuel PDF ----------
 export interface AnalyticsPdfData {
-  summary: { total: number; confirmes: number; tauxConfirmation: number; maladiesActives: number }
+  summary: { total: number; confirmes: number; tauxConfirmation: number; maladiesDeclarees: number; totalMaladies: number; communesTouchees: number }
   prevalence: { name: string; count: number }[]
   weeklyTrend: { date: string; count: number }[]
   ageDistribution: { name: string; count: number }[]
@@ -443,7 +443,7 @@ export async function exportAnalysesPdf(data: AnalyticsPdfData) {
     { label: "Total Cas",         value: String(data.summary.total),              color: EHU_BLUE },
     { label: "Cas Confirmés",     value: String(data.summary.confirmes),           color: [5, 150, 105] as [number, number, number] },
     { label: "Taux Confirmation", value: `${data.summary.tauxConfirmation}%`,      color: [37, 99, 235] as [number, number, number] },
-    { label: "Maladies Actives",  value: String(data.summary.maladiesActives),     color: [180, 140, 50] as [number, number, number] },
+    { label: "Profil MDO",        value: `${data.summary.maladiesDeclarees}/${data.summary.totalMaladies}`, color: [180, 140, 50] as [number, number, number] },
   ]
   const kpiW = 45
   kpis.forEach((kpi, i) => {
@@ -616,7 +616,7 @@ export async function printAnalysesPdf(data: AnalyticsPdfData) {
     { label: "Total Cas",         value: String(data.summary.total),              color: EHU_BLUE },
     { label: "Cas Confirmés",     value: String(data.summary.confirmes),           color: [5, 150, 105] as [number, number, number] },
     { label: "Taux Confirmation", value: `${data.summary.tauxConfirmation}%`,      color: [37, 99, 235] as [number, number, number] },
-    { label: "Maladies Actives",  value: String(data.summary.maladiesActives),     color: [180, 140, 50] as [number, number, number] },
+    { label: "Profil MDO",        value: `${data.summary.maladiesDeclarees}/${data.summary.totalMaladies}`, color: [180, 140, 50] as [number, number, number] },
   ]
   const kpiW = 45
   kpis.forEach((kpi, i) => {

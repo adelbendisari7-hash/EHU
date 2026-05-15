@@ -127,12 +127,42 @@ export async function GET(req: Request) {
   const confirmes = allCas.filter(c => c.statut === "confirme").length
   const tauxConfirmation = total > 0 ? Math.round((confirmes / total) * 100) : 0
 
+  // Commune distribution
+  const byCommune = await prisma.casDeclare.groupBy({
+    by: ["communeId"],
+    where,
+    _count: { id: true },
+    orderBy: { _count: { id: "desc" } },
+  })
+  const communeFetchIds = byCommune.map(r => r.communeId).filter((id): id is string => Boolean(id))
+  const communesRef = await prisma.commune.findMany({
+    where: { id: { in: communeFetchIds } },
+    select: { id: true, nom: true },
+  })
+  const communeNameMap = Object.fromEntries(communesRef.map(c => [c.id, c.nom]))
+  const communeDistribution = byCommune.slice(0, 10).map(r => ({
+    name: r.communeId ? (communeNameMap[r.communeId] ?? "Inconnu") : "Non renseigné",
+    count: r._count.id,
+  }))
+  const communesTouchees = communeFetchIds.length
+
+  // Total maladies in the system
+  const totalMaladies = await prisma.maladie.count({ where: { isActive: true } })
+
   return NextResponse.json({
     prevalence,
     statutDistribution,
     ageDistribution,
     sexDistribution,
     weeklyTrend,
-    summary: { total, confirmes, tauxConfirmation, maladiesActives: maladieFetchIds.length },
+    communeDistribution,
+    summary: {
+      total,
+      confirmes,
+      tauxConfirmation,
+      maladiesDeclarees: maladieFetchIds.length,
+      totalMaladies,
+      communesTouchees,
+    },
   })
 }

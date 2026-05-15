@@ -77,12 +77,12 @@ async function main() {
   }
   console.log(`  ✓ ${SYMPTOMS.length} symptômes`)
 
-  // Germes (codes SNOMED CT)
-  console.log("Seeding germes SNOMED CT...")
+  // Germes BMR CIM-10
+  console.log("Seeding germes BMR CIM-10...")
   for (const g of GERMES) {
     await prisma.germe.upsert({
-      where: { code: g.code },
-      update: { nom: g.nom, type: g.type },
+      where: { nom: g.nom },
+      update: { code: g.code, type: g.type },
       create: { code: g.code, nom: g.nom, type: g.type },
     })
   }

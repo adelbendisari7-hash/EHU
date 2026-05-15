@@ -3,6 +3,7 @@ import Link from "next/link"
 const SETTINGS_SECTIONS = [
   { href: "/parametres/protocoles", label: "Protocoles Médicaux", desc: "Conduites médicales, actions administratives et étapes d'investigation par maladie", badge: "Nouveau" },
   { href: "/parametres/seuils", label: "Seuils d'Alerte", desc: "Configurer les seuils de déclenchement automatique par maladie et périmètre", badge: "Nouveau" },
+  { href: "/parametres/referentiels", label: "Référentiels", desc: "Gérer les symptômes, germes BMR et antécédents utilisés dans les formulaires de déclaration", badge: "Nouveau" },
   { href: "/parametres/medecins", label: "Médecins Déclarants", desc: "Gérer la liste des médecins déclarants utilisés dans les fiches de déclaration" },
   { href: "/parametres/maladies", label: "Maladies MDO", desc: "Gérer la liste des maladies à déclaration obligatoire" },
   { href: "/parametres/etablissements", label: "Établissements", desc: "Gérer les établissements de santé" },

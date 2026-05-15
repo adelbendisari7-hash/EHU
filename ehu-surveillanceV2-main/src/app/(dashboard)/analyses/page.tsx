@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  Cell, PieChart, Pie, LineChart, Line,
+  Cell, PieChart, Pie, LineChart, Line, LabelList,
 } from "recharts"
 import AnalysesExportMenu from "@/components/analyses/analyses-export-menu"
 import DashboardFilters, { type DashboardFiltersState } from "@/components/dashboard/dashboard-filters"
@@ -22,7 +22,15 @@ interface AnalyticsData {
   ageDistribution: { name: string; count: number }[]
   sexDistribution: { name: string; count: number }[]
   weeklyTrend: { date: string; count: number }[]
-  summary: { total: number; confirmes: number; tauxConfirmation: number; maladiesActives: number }
+  communeDistribution: { name: string; count: number }[]
+  summary: {
+    total: number
+    confirmes: number
+    tauxConfirmation: number
+    maladiesDeclarees: number
+    totalMaladies: number
+    communesTouchees: number
+  }
 }
 
 interface RefItem { id: string; nom: string }
@@ -96,9 +104,13 @@ export default function AnalysesPage() {
         <div className="grid grid-cols-4 gap-4 mb-6">
           {[
             { label: "TOTAL CAS", value: data.summary.total, color: "#1B4F8A" },
-            { label: "CAS CONFIRMÉS", value: data.summary.confirmes, color: "#E74C3C" },
+            { label: "COMMUNES TOUCHÉES", value: data.summary.communesTouchees, color: "#0891B2" },
             { label: "TAUX CONFIRMATION", value: `${data.summary.tauxConfirmation}%`, color: "#F39C12" },
-            { label: "MALADIES ACTIVES", value: data.summary.maladiesActives, color: "#27AE60" },
+            {
+              label: "PROFIL MDO",
+              value: `${data.summary.maladiesDeclarees}/${data.summary.totalMaladies}`,
+              color: "#27AE60",
+            },
           ].map(card => (
             <div key={card.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">{card.label}</p>
@@ -115,7 +127,7 @@ export default function AnalysesPage() {
           {/* Prevalence + Weekly trend */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <p className="text-sm font-semibold text-gray-700 mb-3">Prévalence par Maladie</p>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Effectif par Maladie</p>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={data.prevalence} layout="vertical" margin={{ left: 10, right: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#EBEDEF" horizontal={false} />
@@ -142,6 +154,33 @@ export default function AnalysesPage() {
               </ResponsiveContainer>
             </div>
           </div>
+
+          {/* Commune distribution */}
+          {data.communeDistribution && data.communeDistribution.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <p className="text-sm font-semibold text-gray-700 mb-3">
+                Répartition par Commune
+                <span className="ml-2 text-[11px] font-normal text-gray-400">(top {data.communeDistribution.length})</span>
+              </p>
+              <ResponsiveContainer width="100%" height={Math.max(180, data.communeDistribution.length * 28)}>
+                <BarChart data={data.communeDistribution} layout="vertical" margin={{ left: 10, right: 40 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#EBEDEF" horizontal={false} />
+                  <XAxis type="number" tick={{ fontSize: 11, fill: "#8A909B" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#4A5164" }} tickLine={false} axisLine={false} width={120} />
+                  <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #EBEDEF", fontSize: "12px" }} formatter={(v) => [v, "Cas"]} />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={16}>
+                    {data.communeDistribution.map((entry, i) => {
+                      const max = data.communeDistribution[0]?.count ?? 1
+                      const ratio = entry.count / max
+                      const color = ratio > 0.7 ? "#E74C3C" : ratio > 0.4 ? "#F39C12" : "#1B4F8A"
+                      return <Cell key={i} fill={color} />
+                    })}
+                    <LabelList dataKey="count" position="right" style={{ fontSize: 11, fill: "#6B7280", fontWeight: 600 }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
 
           {/* Age + Sex + Status */}
           <div className="grid grid-cols-3 gap-4">

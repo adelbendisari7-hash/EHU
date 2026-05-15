@@ -18,8 +18,8 @@ async function main() {
   console.log("Seeding germes...")
   for (const g of GERMES) {
     await prisma.germe.upsert({
-      where: { code: g.code },
-      update: { nom: g.nom, type: g.type },
+      where: { nom: g.nom },
+      update: { code: g.code, type: g.type },
       create: { code: g.code, nom: g.nom, type: g.type },
     })
   }

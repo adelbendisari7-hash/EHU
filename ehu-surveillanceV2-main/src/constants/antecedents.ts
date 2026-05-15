@@ -1,0 +1,17 @@
+export const ANTECEDENTS_PREDEFINED = [
+  "HTA (Hypertension artérielle)",
+  "Diabète",
+  "Cancer",
+  "IRC (Insuffisance rénale chronique)",
+  "Cardiopathie",
+  "Maladie pulmonaire chronique",
+  "AVC",
+  "Maladies thyroïdiennes",
+  "Obésité",
+  "Cirrhose hépatique",
+  "VIH / SIDA",
+  "Drépanocytose",
+  "Immunodépression",
+  "Grossesse",
+  "Autres",
+] as const

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Next.js (App Router) + TypeScript epidemiological disease surveillance system for EHU Oran, Algeria. Tracks mandatory disease declarations (MDO), patient cases, epidemiological investigations, alerts, and generates reports.
+Next.js (App Router) + TypeScript epidemiological disease surveillance system for EHU Oran, Algeria. Tracks mandatory disease declarations (MDO), patient cases, epidemiological investigations, alerts, and generates reports. The UI and all domain data are in French.
 
 ## Commands
 
@@ -18,12 +18,14 @@ npm run lint          # ESLint check
 # Testing (Vitest)
 npm run test          # Run all tests once
 npm run test:watch    # Watch mode
+npx vitest run __tests__/utils/format-date.test.ts  # Run a single test file
 
 # Database
-npm run db:migrate    # Apply pending Prisma migrations
+npm run db:migrate    # Apply pending Prisma migrations (production)
 npm run db:seed       # Seed reference data (48 wilayas, 1541 communes, all MDO diseases)
-npx prisma migrate dev --name <name>  # Create a new migration
-npx prisma studio     # Open Prisma Studio
+npx prisma migrate dev --name <name>  # Create a new migration (development)
+npx prisma generate   # Regenerate Prisma Client after schema changes
+npx prisma studio     # Open Prisma Studio GUI
 ```
 
 ## Environment Variables
@@ -43,78 +45,80 @@ Optional (file storage):
 ### Request Flow
 
 ```
-Request → middleware.ts (auth check) → app/api/*/route.ts → src/services/*.service.ts → Prisma → PostgreSQL
+Request → middleware.ts (JWT auth check) → app/api/*/route.ts → src/services/ → Prisma → PostgreSQL
 ```
-
-API routes never call Prisma directly — always through service functions in `src/services/`.
 
 ### Routing Structure
 
 - `src/app/(auth)/` — Public routes: login, forgot-password, reset-password
-- `src/app/(dashboard)/` — Protected routes behind sidebar layout
-- `src/app/api/` — REST API handlers
-- `src/middleware.ts` — Intercepts all requests; allows only `/login`, `/forgot-password`, `/reset-password` unauthenticated
+- `src/app/(dashboard)/` — Protected routes behind sidebar layout; one folder per feature
+- `src/app/api/` — REST API handlers; collection at `[resource]/route.ts`, single item at `[resource]/[id]/route.ts`
+- `middleware.ts` — Intercepts all requests; allows only `/login`, `/forgot-password`, `/reset-password` unauthenticated; uses `authjs.session-token` cookie (or `__Secure-` prefix on HTTPS)
 
 ### API Route Convention
 
 Every route handler must follow this pattern:
 1. `auth()` → 401 if unauthenticated
-2. Check `session.user.permissions` (with DB fallback) → 403 if unauthorized
-3. Validate body/params with Zod schema from `src/lib/validators.ts` → 400 if invalid
-4. Call service function
+2. Check permissions → 403 if unauthorized
+3. Validate body/params with Zod schema → 400 if invalid
+4. Call service function (business logic never belongs in route handlers)
 5. Write to `audit_logs` for any mutation
 6. Return JSON with appropriate HTTP status
 
-### Service Layer
-
-Business logic lives in `src/services/*.service.ts`. Services receive validated data, apply domain rules (e.g., alert threshold evaluation), and return typed results. Never put business logic in route handlers.
-
 ### Authentication & Roles
 
-- NextAuth.js v5 with CredentialsProvider, JWT strategy, 8-hour sessions
-- Roles: `medecin` (declare cases), `epidemiologiste` (investigate + analyze), `admin` (full access)
+- NextAuth.js v5 (`next-auth@5.0.0-beta`) with CredentialsProvider, JWT strategy, 8-hour sessions
+- Three roles: `medecin` (declare cases), `epidemiologiste` (investigate + analyze), `admin` (full access)
+- Full RBAC via `Role`/`Permission`/`RolePermission`/`UserRole` models in DB
 - JWT claims include: `userId`, `role`, `roles[]`, `permissions[]`, `etablissementId`, `wilayadId`
-- Password reset uses 32-byte hex token → SHA-256 hash stored in DB, 1-hour expiry
+- Auth config in `src/lib/auth.ts`; exported `auth`, `signIn`, `signOut`, `handlers`
 
 ### Key Directories
 
 | Path | Purpose |
 |------|---------|
-| `src/lib/validators.ts` | All Zod schemas — single source of truth for validation |
 | `src/lib/auth.ts` | NextAuth configuration |
-| `src/lib/prisma.ts` | Prisma Client singleton |
-| `src/services/` | Business logic layer |
-| `src/components/ui/` | shadcn/ui primitives (Radix UI) |
+| `src/lib/prisma.ts` | Prisma Client singleton (prevents hot-reload duplication) |
+| `src/lib/validators.ts` | All Zod schemas — single source of truth for validation |
+| `src/services/` | Business logic layer called by API routes |
+| `src/components/ui/` | shadcn/ui primitives (Radix UI) — do not edit manually |
 | `src/components/shared/` | Reusable cross-feature components |
+| `src/constants/` | App-wide enums and lookup tables (statuts, roles, reference data) |
 | `prisma/schema.prisma` | Database schema (26 models) |
 | `prisma/seed.ts` | Reference data seeder |
 
 ### Database Schema Key Models
 
-- **CasDeclare** — Core case declaration with MDO fields (symptoms, location, hospitalization, lab results)
-- **Patient** — Demographics and location (linked to CasDeclare)
-- **Investigation** — Launched from a case; tracks contacts, timeline, source hypothesis
-- **Alerte** — Epidemic/threshold/informational alerts; evaluated via `SeuilAlerte` thresholds
-- **Maladie** — Disease master list (CIM-10 codes, notification delays, alert thresholds)
-- **User** — Staff with role-based permissions; linked to Etablissement and Wilaya
-- **Rapport** — Monthly/quarterly/annual reports stored as PDF/Excel in S3
+- **CasDeclare** — Core case declaration; statut enum: `brouillon | suspect | confirme`; related: `CasSymptome`, `CasLieu` (up to 4 locations), `ResultatLabo`, `Fichier`
+- **Patient** — Demographics linked to cases
+- **Investigation** — Launched from a case; tracks contacts via `Contact` model
+- **Alerte** — Epidemic/threshold/informational alerts; thresholds defined in `SeuilAlerte`
+- **Maladie** — Disease master list (CIM-10 codes, notification delays); `hasFicheSpecifique` flag links to `FicheSpecifiqueTemplate`
+- **User** — Staff with role-based permissions; linked to `Etablissement` and `Wilaya`
+- **Protocole** — Clinical protocol per disease; triggered via `ProtocoleDeclenchement`
+- **Rapport** — Monthly/quarterly/annual reports stored as PDF/Excel
 - **AuditLog** — Immutable activity log for compliance
 
-Soft deletes use `is_active: Boolean` — never hard-delete records.
+Soft deletes on most reference models use `isActive: Boolean`. `CasDeclare` uses the `CasStatut` enum workflow (`brouillon → suspect → confirme`) rather than deletion.
 
 ### Frontend Patterns
 
 - React Server Components by default; add `"use client"` only when needed (forms, maps, charts)
 - Forms use React Hook Form + Zod resolver; schemas imported from `src/lib/validators.ts`
-- Maps (Leaflet) and charts (Recharts) are always client components
+- Maps (Leaflet via `react-leaflet`) must be wrapped in `dynamic(..., { ssr: false })`
+- Charts use Recharts (client-only)
 - Path alias `@/` maps to `src/` — use it for all imports
 - CSS design system in `src/app/globals.css` (CSS variables); primary brand color `#1B4F8A`
+- Tailwind v4 with PostCSS plugin (`@tailwindcss/postcss`) — no `tailwind.config.js`
 
 ## Key Conventions
 
 - **Dates:** ISO strings in DB, displayed as `DD/MM/YYYY` (French locale via `src/utils/format-date.ts`)
-- **IDs:** All UUIDs generated via `src/utils/generate-id.ts`
+- **IDs:** All UUIDs generated server-side via `src/utils/generate-id.ts`
 - **Imports:** Always use `@/` alias (e.g., `@/lib/prisma`, `@/types`)
-- **JSON columns:** Flexible fields (`mesures_controle`, `zone_geographique`) use JSONB
-- **UI language:** French throughout (labels, error messages, dates)
-- **Tailwind:** Version 4 with PostCSS plugin (`@tailwindcss/postcss`) — not the classic CLI
+- **JSON columns:** Flexible fields (`mesures_controle`, `zone_geographique`, `donnees_specifiques`) use JSONB
+- **UI language:** French throughout (labels, error messages, dates, disease names)
+
+## OCR Microservice
+
+`ocr-service/` is a separate Python/FastAPI service for scanning paper declaration forms. It runs as a Docker container (see `ocr-service/docker-compose.yml` and `ocr-service/Dockerfile`). It has its own `.env.example`. It is independent of the Next.js app and communicates over HTTP.

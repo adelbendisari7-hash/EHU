@@ -17,7 +17,7 @@ export interface CasRow {
 }
 
 export interface AnalyticsExcelData {
-  summary: { total: number; confirmes: number; tauxConfirmation: number; maladiesActives: number }
+  summary: { total: number; confirmes: number; tauxConfirmation: number; maladiesDeclarees: number; totalMaladies: number; communesTouchees: number }
   prevalence: { name: string; count: number }[]
   ageDistribution: { name: string; count: number }[]
   sexDistribution: { name: string; count: number }[]
@@ -92,7 +92,7 @@ export async function exportAnalysesExcel(data: AnalyticsExcelData) {
     { "Indicateur": "Total Cas", "Valeur": data.summary.total },
     { "Indicateur": "Cas Confirmés", "Valeur": data.summary.confirmes },
     { "Indicateur": "Taux de Confirmation", "Valeur": `${data.summary.tauxConfirmation}%` },
-    { "Indicateur": "Maladies Actives", "Valeur": data.summary.maladiesActives },
+    { "Indicateur": "Profil MDO", "Valeur": `${data.summary.maladiesDeclarees}/${data.summary.totalMaladies}` },
     { "Indicateur": "Période Analysée", "Valeur": data.period },
   ]
   const wsSummary = XLSX.utils.json_to_sheet(summaryRows)

@@ -55,7 +55,7 @@ export async function GET(req: Request) {
     nombreCas,
     casComplets,
     casConfirmes,
-    casDeces,
+    casSuspects,
     casPrevPeriode,
   ] = await Promise.all([
     // Total cas (non-brouillon) dans la période filtrée
@@ -71,18 +71,15 @@ export async function GET(req: Request) {
         dateDebutSymptomes: { not: null },
       },
     }),
-    // Cas confirmés (dénominateur CFR)
+    // Cas confirmés
     prisma.casDeclare.count({ where: { ...where, statut: "confirme" } }),
-    // Décès
-    prisma.casDeclare.count({ where: { ...where, dateDeces: { not: null } } }),
+    // Cas suspects
+    prisma.casDeclare.count({ where: { ...where, statut: "suspect" } }),
     // Période précédente (pour évolution)
     prisma.casDeclare.count({ where: { ...prevWhere, statut: { not: "brouillon" } } }),
   ])
 
   const tauxCompletude = nombreCas > 0 ? Math.round((casComplets / nombreCas) * 100) : 0
-  const tauxLethalite = casConfirmes > 0
-    ? parseFloat(((casDeces / casConfirmes) * 100).toFixed(1))
-    : 0
   const evolutionPct = casPrevPeriode > 0
     ? Math.round(((nombreCas - casPrevPeriode) / casPrevPeriode) * 100)
     : nombreCas > 0 ? 100 : 0
@@ -245,17 +242,34 @@ export async function GET(req: Request) {
     count: c._count.id,
   }))
 
+  // ── Service distribution ─────────────────────────────────────────────────
+  const casByService = await prisma.casDeclare.groupBy({
+    by: ["serviceDeclarant"],
+    where,
+    _count: { id: true },
+    orderBy: { _count: { id: "desc" } },
+    take: 8,
+  })
+
+  const serviceDistribution = casByService
+    .filter(c => c.serviceDeclarant && c.serviceDeclarant.trim())
+    .map(c => ({
+      name: c.serviceDeclarant!.trim(),
+      count: c._count.id,
+    }))
+
   return NextResponse.json({
     stats: {
       nombreCas,
+      casConfirmes,
+      casSuspects,
       tauxCompletude,
-      tauxLethalite,
-      hotspot,
       evolutionPct,
     },
     mapMarkers,
     wilayaStats,
     epidemicCurve,
     diseaseDistribution,
+    serviceDistribution,
   })
 }

@@ -33,6 +33,7 @@ interface DashboardData {
   wilayaStats: WilayaStat[]
   epidemicCurve: Array<{ date: string; count: number }>
   diseaseDistribution: Array<{ name: string; count: number }>
+  serviceDistribution: Array<{ name: string; count: number }>
 }
 
 interface Props {
@@ -110,24 +111,29 @@ export default function DashboardClient({ maladies, communes, wilayas, userName 
         <div className="space-y-4">
           <StatCards stats={data!.stats} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <div className="lg:col-span-2 card p-5">
-              <div className="flex items-center justify-between mb-4">
-                <p className="card-title">Carte Épidémique</p>
-                <span className="text-[11px] text-gray-400 font-medium">Wilaya d&apos;Oran</span>
-              </div>
-              <div className="rounded-lg overflow-hidden" style={{ height: "340px" }}>
-                <EpidemicMap
-                  markers={data!.mapMarkers}
-                  wilayaStats={data!.wilayaStats ?? []}
-                  selectedWilayadIds={filters.wilayadIds}
-                  allWilayas={wilayas}
-                />
-              </div>
-            </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="card p-5">
               <p className="card-title mb-4">Répartition par Maladie</p>
-              {loading ? <Sk w="100%" h={280} rounded={8} /> : <DiseaseDistribution data={data!.diseaseDistribution} />}
+              {loading ? <Sk w="100%" h={280} rounded={8} /> : <DiseaseDistribution data={data!.diseaseDistribution} total={data!.stats.nombreCas} />}
+            </div>
+            <div className="card p-5">
+              <p className="card-title mb-4">Répartition par Service</p>
+              {loading ? <Sk w="100%" h={280} rounded={8} /> : <DiseaseDistribution data={data!.serviceDistribution} total={data!.stats.nombreCas} />}
+            </div>
+          </div>
+
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <p className="card-title">Carte Épidémique</p>
+              <span className="text-[11px] text-gray-400 font-medium">Wilaya d&apos;Oran</span>
+            </div>
+            <div className="rounded-lg overflow-hidden" style={{ height: "340px" }}>
+              <EpidemicMap
+                markers={data!.mapMarkers}
+                wilayaStats={data!.wilayaStats ?? []}
+                selectedWilayadIds={filters.wilayadIds}
+                allWilayas={wilayas}
+              />
             </div>
           </div>
 

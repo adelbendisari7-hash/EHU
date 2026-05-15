@@ -1,7 +1,7 @@
-// Référentiel des germes/pathogènes — Codes SNOMED CT (SCT) internationaux
-// Source : SNOMED Clinical Terms International Edition — utilisé par OMS, ECDC, CDC
+// Référentiel des agents infectieux BMR — Codes CIM-10
+// Source : EHU Oran — Service d'Épidémiologie et de Médecine Préventive
 export interface GermeRef {
-  code: string   // Code SNOMED CT au format "SCT-XXXXXXX"
+  code: string  // Code CIM-10
   nom: string
   type: "bacterie" | "virus" | "parasite" | "champignon"
 }
@@ -14,68 +14,36 @@ export const GERME_TYPES = [
 ] as const
 
 export const GERMES: GermeRef[] = [
-  // ── Bactéries ─────────────────────────────────────────────────────────────
-  { code: "SCT-5209001",   nom: "Salmonella typhi",                 type: "bacterie" },
-  { code: "SCT-85908007",  nom: "Salmonella paratyphi",             type: "bacterie" },
-  { code: "SCT-75953000",  nom: "Vibrio cholerae",                  type: "bacterie" },
-  { code: "SCT-77352002",  nom: "Shigella spp.",                    type: "bacterie" },
-  { code: "SCT-116395006", nom: "Escherichia coli O157:H7",         type: "bacterie" },
-  { code: "SCT-17872004",  nom: "Neisseria meningitidis",           type: "bacterie" },
-  { code: "SCT-9861002",   nom: "Streptococcus pneumoniae",         type: "bacterie" },
-  { code: "SCT-113858008", nom: "Mycobacterium tuberculosis",       type: "bacterie" },
-  { code: "SCT-5500001",   nom: "Bordetella pertussis",             type: "bacterie" },
-  { code: "SCT-5851001",   nom: "Corynebacterium diphtheriae",      type: "bacterie" },
-  { code: "SCT-77664004",  nom: "Clostridium tetani",               type: "bacterie" },
-  { code: "SCT-25981007",  nom: "Brucella spp.",                    type: "bacterie" },
-  { code: "SCT-80897008",  nom: "Legionella pneumophila",           type: "bacterie" },
-  { code: "SCT-33526006",  nom: "Listeria monocytogenes",           type: "bacterie" },
-  { code: "SCT-115329001", nom: "Staphylococcus aureus (MRSA)",     type: "bacterie" },
-  { code: "SCT-713032009", nom: "Acinetobacter baumannii",          type: "bacterie" },
-  { code: "SCT-56415008",  nom: "Klebsiella pneumoniae",            type: "bacterie" },
-  { code: "SCT-52499004",  nom: "Pseudomonas aeruginosa",           type: "bacterie" },
-  { code: "SCT-372132006", nom: "Enterococcus résistant (ERV/VRE)", type: "bacterie" },
-  { code: "SCT-43499008",  nom: "Haemophilus influenzae",           type: "bacterie" },
-  { code: "SCT-50043002",  nom: "Streptococcus pyogenes (Groupe A)",type: "bacterie" },
-  { code: "SCT-40886007",  nom: "Neisseria gonorrhoeae",            type: "bacterie" },
-  { code: "SCT-4776004",   nom: "Treponema pallidum",               type: "bacterie" },
-  { code: "SCT-27836007",  nom: "Bordetella parapertussis",          type: "bacterie" },
-  { code: "SCT-83436008",  nom: "Rickettsia spp.",                  type: "bacterie" },
+  // ── BMR — Résistance aux antibactériens (U82) ──────────────────────────────
+  { code: "U82.0", nom: "Staphylococcus aureus résistant à la méticilline (SARM/MRSA)", type: "bacterie" },
+  { code: "U82.1", nom: "Enterococcus faecalis/faecium résistant à la vancomycine (ERV/VRE)", type: "bacterie" },
+  { code: "U82.2", nom: "Enterobacter cloacae multirésistant", type: "bacterie" },
+  { code: "U82.2", nom: "Entérobactéries productrices de carbapénémases (EPC/CRE)", type: "bacterie" },
+  { code: "U82.2", nom: "Entérobactéries productrices de β-lactamases à spectre étendu (BLSE/ESBL)", type: "bacterie" },
+  { code: "U82.2", nom: "Escherichia coli multirésistant (y compris BLSE)", type: "bacterie" },
+  { code: "U82.2", nom: "Klebsiella pneumoniae multirésistante (BLSE ou carbapénémase)", type: "bacterie" },
+  { code: "U82.2", nom: "Résistance des entérobactéries aux céphalosporines de 3e génération (BLSE)", type: "bacterie" },
+  { code: "U82.3", nom: "Pseudomonas aeruginosa multirésistant", type: "bacterie" },
+  { code: "U82.4", nom: "Acinetobacter baumannii multirésistant", type: "bacterie" },
+  { code: "U82.5", nom: "Staphylococcus aureus résistant à la vancomycine (VRSA)", type: "bacterie" },
+  { code: "U82.8", nom: "Autres bactéries résistantes (à préciser)", type: "bacterie" },
+  { code: "U82.8", nom: "Stenotrophomonas maltophilia multirésistant", type: "bacterie" },
+  { code: "U82.9", nom: "Résistance d'organisme non spécifié aux antibiotiques", type: "bacterie" },
 
-  // ── Virus ──────────────────────────────────────────────────────────────────
-  { code: "SCT-840533007", nom: "SARS-CoV-2 (COVID-19)",            type: "virus" },
-  { code: "SCT-407475007", nom: "Virus Influenza A",                type: "virus" },
-  { code: "SCT-407476008", nom: "Virus Influenza B",                type: "virus" },
-  { code: "SCT-62944002",  nom: "Virus de l'hépatite A (VHA)",      type: "virus" },
-  { code: "SCT-12238009",  nom: "Virus de l'hépatite B (VHB)",      type: "virus" },
-  { code: "SCT-50711007",  nom: "Virus de l'hépatite C (VHC)",      type: "virus" },
-  { code: "SCT-19030005",  nom: "VIH (Virus de l'immunodéficience humaine)", type: "virus" },
-  { code: "SCT-52584002",  nom: "Virus de la rougeole",             type: "virus" },
-  { code: "SCT-56750001",  nom: "Virus de la rubéole",              type: "virus" },
-  { code: "SCT-34348001",  nom: "Virus de la dengue (DENV)",        type: "virus" },
-  { code: "SCT-121855002", nom: "Virus du chikungunya (CHIKV)",     type: "virus" },
-  { code: "SCT-407327008", nom: "Virus Zika (ZIKV)",                type: "virus" },
-  { code: "SCT-186150001", nom: "Rotavirus",                        type: "virus" },
-  { code: "SCT-407359008", nom: "Norovirus",                        type: "virus" },
-  { code: "SCT-59881000",  nom: "Virus de la rage (RABV)",          type: "virus" },
-  { code: "SCT-406572005", nom: "West Nile virus (WNV)",            type: "virus" },
-  { code: "SCT-243612006", nom: "Virus de la poliomyélite (Poliovirus)", type: "virus" },
-  { code: "SCT-243617000", nom: "Virus de la varicelle-zona (VZV)", type: "virus" },
-  { code: "SCT-243621005", nom: "Virus Ebola",                      type: "virus" },
+  // ── Résistance aux antituberculeux (U83) ───────────────────────────────────
+  { code: "U83.0", nom: "Mycobacterium tuberculosis multirésistant (MDR-TB)", type: "bacterie" },
+  { code: "U83.0", nom: "Tuberculose multirésistante (MDR-TB)", type: "bacterie" },
+  { code: "U83.1", nom: "Mycobacterium tuberculosis ultrarésistant (XDR-TB)", type: "bacterie" },
+  { code: "U83.1", nom: "Tuberculose ultrarésistante (XDR-TB)", type: "bacterie" },
+  { code: "U83.8", nom: "Résistance à d'autres antituberculeux précisés", type: "bacterie" },
+  { code: "U83.9", nom: "Résistance non spécifiée aux antituberculeux", type: "bacterie" },
 
-  // ── Parasites ──────────────────────────────────────────────────────────────
-  { code: "SCT-372314000", nom: "Plasmodium falciparum",            type: "parasite" },
-  { code: "SCT-83821001",  nom: "Plasmodium vivax",                 type: "parasite" },
-  { code: "SCT-85777006",  nom: "Plasmodium malariae",              type: "parasite" },
-  { code: "SCT-17078005",  nom: "Leishmania spp.",                  type: "parasite" },
-  { code: "SCT-28169003",  nom: "Toxoplasma gondii",                type: "parasite" },
-  { code: "SCT-74160002",  nom: "Giardia lamblia (duodenalis)",     type: "parasite" },
-  { code: "SCT-50464009",  nom: "Entamoeba histolytica",            type: "parasite" },
-  { code: "SCT-44551004",  nom: "Echinococcus granulosus",          type: "parasite" },
-  { code: "SCT-21061004",  nom: "Trichinella spiralis",             type: "parasite" },
+  // ── Résistance aux autres antimicrobiens (U84) ─────────────────────────────
+  { code: "U84.0", nom: "Résistance aux antiviraux", type: "virus" },
+  { code: "U84.1", nom: "Résistance aux antifongiques", type: "champignon" },
+  { code: "U84.2", nom: "Résistance aux antiparasitaires", type: "parasite" },
 
-  // ── Champignons ────────────────────────────────────────────────────────────
-  { code: "SCT-53326005",  nom: "Candida albicans",                 type: "champignon" },
-  { code: "SCT-83819000",  nom: "Aspergillus spp.",                 type: "champignon" },
-  { code: "SCT-67609007",  nom: "Cryptococcus neoformans",          type: "champignon" },
-  { code: "SCT-11162004",  nom: "Histoplasma capsulatum",           type: "champignon" },
+  // ── Autres agents bactériens (B96) ─────────────────────────────────────────
+  { code: "B96.4", nom: "Proteus mirabilis", type: "bacterie" },
+  { code: "B96.9", nom: "Morganella morganii", type: "bacterie" },
 ]

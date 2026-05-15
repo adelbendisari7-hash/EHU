@@ -1,13 +1,13 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Activity, CheckSquare, Skull, MapPin, TrendingUp, TrendingDown, Minus } from "lucide-react"
+import { Activity, CheckSquare, CheckCircle2, AlertTriangle, TrendingUp, TrendingDown, Minus } from "lucide-react"
 
 export interface DashboardStats {
   nombreCas: number
+  casConfirmes: number
+  casSuspects: number
   tauxCompletude: number
-  tauxLethalite: number
-  hotspot: { nom: string; count: number; type: "wilaya" | "commune" }
   evolutionPct: number
 }
 
@@ -132,43 +132,6 @@ function EvolutionCard({
   )
 }
 
-function HotspotCard({
-  hotspot,
-  delay = 0,
-}: {
-  hotspot: DashboardStats["hotspot"]
-  delay?: number
-}) {
-  const color = "#0891B2"
-  const bgColor = "#ECFEFF"
-  const label = hotspot.type === "wilaya" ? "Wilaya la plus touchée" : "Commune la plus touchée"
-
-  return (
-    <div
-      className="bg-white rounded-xl border border-gray-100 p-5 card-hover relative overflow-hidden animate-fade-in-up"
-      style={{ animationDelay: `${delay}ms`, boxShadow: "var(--shadow-sm)" }}
-    >
-      <div className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full" style={{ backgroundColor: color }} />
-
-      <div className="flex items-start justify-between mb-4 pl-2">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-gray-400">{label}</p>
-        <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: bgColor }}>
-          <MapPin size={15} style={{ color }} />
-        </div>
-      </div>
-
-      <div className="pl-2">
-        <p className="text-2xl font-bold counter-in tracking-tight truncate" style={{ color }}>
-          {hotspot.nom}
-        </p>
-        <p className="text-[11px] text-gray-400 mt-1 leading-relaxed">
-          {hotspot.count > 0 ? `${hotspot.count} cas déclarés` : "aucun cas localisé"}
-        </p>
-      </div>
-    </div>
-  )
-}
-
 export default function StatCards({ stats }: { stats: DashboardStats }) {
   return (
     <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -182,6 +145,24 @@ export default function StatCards({ stats }: { stats: DashboardStats }) {
         delay={0}
       />
       <StatCard
+        label="Cas Confirmés"
+        value={stats.casConfirmes}
+        sub="statut confirmé"
+        color="#059669"
+        bgColor="#ECFDF5"
+        icon={CheckCircle2}
+        delay={50}
+      />
+      <StatCard
+        label="Cas Suspects"
+        value={stats.casSuspects}
+        sub="en attente de confirmation"
+        color="#D97706"
+        bgColor="#FFFBEB"
+        icon={AlertTriangle}
+        delay={100}
+      />
+      <StatCard
         label="Complétude des Fiches"
         value={stats.tauxCompletude}
         suffix="%"
@@ -189,19 +170,8 @@ export default function StatCards({ stats }: { stats: DashboardStats }) {
         color="#7C3AED"
         bgColor="#F5F0FF"
         icon={CheckSquare}
-        delay={50}
+        delay={150}
       />
-      <StatCard
-        label="Taux de Létalité (CFR)"
-        value={String(stats.tauxLethalite)}
-        suffix="%"
-        sub="décès / cas confirmés"
-        color={stats.tauxLethalite > 5 ? "#DC2626" : stats.tauxLethalite > 0 ? "#D97706" : "#059669"}
-        bgColor={stats.tauxLethalite > 5 ? "#FEF2F2" : stats.tauxLethalite > 0 ? "#FFFBEB" : "#ECFDF5"}
-        icon={Skull}
-        delay={100}
-      />
-      <HotspotCard hotspot={stats.hotspot} delay={150} />
       <EvolutionCard pct={stats.evolutionPct} delay={200} />
     </div>
   )

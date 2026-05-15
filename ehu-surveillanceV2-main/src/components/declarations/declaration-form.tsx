@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -17,6 +17,7 @@ import { NATIONALITIES } from "@/constants/nationalities"
 import { SYMPTOM_CATEGORIES } from "@/constants/symptoms"
 import { SAMPLE_TYPES } from "@/constants/sample-types"
 import { LIEU_TYPES } from "@/constants/lieu-types"
+import { ANTECEDENTS_PREDEFINED } from "@/constants/antecedents"
 
 // ---------------------------------------------------------------------------
 // Zod Schema
@@ -54,9 +55,9 @@ const declarationSchema = z.object({
   ageMois: optNum(0, 11),
   ageJours: optNum(0, 30),
   sex: z.enum(["homme", "femme"], { message: "Sexe requis" }),
-  address: z.string().min(2, "Adresse requise"),
-  wilayadId: z.string().optional(),
-  communeId: z.string().optional(),
+  address: z.string().optional(),
+  wilayadId: z.string().min(1, "Wilaya requise"),
+  communeId: z.string().min(1, "Commune requise"),
   phone: z.string().optional(),
   emailPatient: z.string().email("Email invalide").optional().or(z.literal("")),
   profession: z.string().optional(),
@@ -69,12 +70,12 @@ const declarationSchema = z.object({
   maladieId: z.string().min(1, "Maladie requise"),
   dateDebutSymptomes: z.string().optional(),
   dateDiagnostic: z.string().optional(),
-  symptomesTexte: z.string().optional(),
+  asymptomatique: z.boolean().optional(),
   observation: z.enum(["cas_confirme", "cas_suspect"]).optional(),
   modeConfirmation: z.enum(["clinique", "biologique", "epidemiologique"]).optional(),
   atcd: z.string().optional(),
   casSimilaire: z.boolean().optional(),
-  casSimilaireId: z.string().optional(),
+  nombreCasSimilaires: optInt(),
 
   // Hospitalisation & Evacuation
   estHospitalise: z.boolean().optional(),
@@ -103,6 +104,8 @@ const brouillonSchema = declarationSchema.partial().extend({
   lastName: z.string().optional(),
   sex: z.enum(["homme", "femme"]).optional(),
   address: z.string().optional(),
+  wilayadId: z.string().optional(),
+  communeId: z.string().optional(),
   nomMedecinDeclarant: z.string().optional(),
   prenomMedecinDeclarant: z.string().optional(),
   serviceDeclarant: z.string().optional(),
@@ -134,14 +137,6 @@ interface Commune { id: string; nom: string; wilayadId: string }
 interface Etablissement { id: string; nom: string }
 interface SymptomeRef { id: string; nom: string; code: string; categorie: string | null }
 interface GermeRef { id: string; nom: string; code: string; type: string | null }
-interface CasSearchResult {
-  id: string
-  codeCas: string
-  statut: string
-  createdAt: string
-  maladie: { nom: string; codeCim10: string }
-  patient: { firstName: string; lastName: string }
-}
 
 interface LieuEntry {
   nom: string
@@ -301,27 +296,47 @@ function SearchableSelect({
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
+  const [dropStyle, setDropStyle] = useState<React.CSSProperties>({})
+  const btnRef = useRef<HTMLButtonElement>(null)
 
   const filtered = options.filter(o =>
-    o.label.toLowerCase().includes(search.toLowerCase())
+    stripAccents(o.label.toLowerCase()).includes(stripAccents(search.toLowerCase()))
   )
   const selected = options.find(o => o.value === value)
+
+  const openDropdown = () => {
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      const estimatedH = Math.min(filtered.length * 36 + 60, 260)
+      const spaceBelow = window.innerHeight - r.bottom
+      const style: React.CSSProperties = { position: "fixed", left: r.left, width: r.width, zIndex: 9999 }
+      if (spaceBelow < estimatedH && r.top > spaceBelow) {
+        style.bottom = window.innerHeight - r.top + 4
+      } else {
+        style.top = r.bottom + 4
+      }
+      setDropStyle(style)
+    }
+    setOpen(v => !v)
+    if (open) setSearch("")
+  }
 
   return (
     <div className="relative">
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={openDropdown}
         className="input w-full text-left flex items-center justify-between"
       >
-        <span className={selected ? "text-gray-900" : "text-gray-400"}>
+        <span className={selected ? "text-gray-900 truncate pr-2" : "text-gray-400 truncate pr-2"}>
           {selected?.label || placeholder}
         </span>
-        <ChevronDown size={14} className="text-gray-400" />
+        <ChevronDown size={14} className="text-gray-400 shrink-0" />
       </button>
       {open && (
-        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden">
-          <div className="p-2 border-b border-gray-100">
+        <div style={dropStyle} className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
+          <div className="p-2 border-b border-gray-100 shrink-0">
             <div className="relative">
               <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -355,7 +370,7 @@ function SearchableSelect({
           </div>
         </div>
       )}
-      {open && <div className="fixed inset-0 z-40" onClick={() => { setOpen(false); setSearch("") }} />}
+      {open && <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => { setOpen(false); setSearch("") }} />}
     </div>
   )
 }
@@ -395,10 +410,22 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
   const [selectedSymptomeIds, setSelectedSymptomeIds] = useState<string[]>([])
   const [lieux, setLieux] = useState<LieuEntry[]>([])
   const [resultatsLabo, setResultatsLabo] = useState<ResultatLaboEntry[]>([])
-  const [casSearchQuery, setCasSearchQuery] = useState("")
-  const [casSearchResults, setCasSearchResults] = useState<CasSearchResult[]>([])
-  const [casSearchLoading, setCasSearchLoading] = useState(false)
-  const [selectedCasSimilaire, setSelectedCasSimilaire] = useState<CasSearchResult | null>(null)
+
+  // New symptom entry state
+  const [newSymptomNom, setNewSymptomNom] = useState("")
+  const [newSymptomCategorie, setNewSymptomCategorie] = useState("")
+  const [newSymptomLoading, setNewSymptomLoading] = useState(false)
+
+  // New germe entry state
+  const [newGermeNom, setNewGermeNom] = useState("")
+  const [newGermeCode, setNewGermeCode] = useState("")
+  const [newGermeLoading, setNewGermeLoading] = useState(false)
+
+  // ATCD multi-select state
+  const [atcdList, setAtcdList] = useState<string[]>([...ANTECEDENTS_PREDEFINED])
+  const [selectedAtcds, setSelectedAtcds] = useState<string[]>([])
+  const [showAtcdDropdown, setShowAtcdDropdown] = useState(false)
+  const [atcdSearch, setAtcdSearch] = useState("")
 
   // Duplicate detection
   const [duplicates, setDuplicates] = useState<{ id: string; codeCas: string; statut: string; maladie: string }[]>([])
@@ -448,6 +475,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
   const maladieId = watch("maladieId")
   const observation = watch("observation")
   const casSimilaire = watch("casSimilaire")
+  const asymptomatique = watch("asymptomatique")
 
   // ---------------------------------------------------------------------------
   // Effects
@@ -636,12 +664,10 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
         maladieId: caseData.maladieId ?? "",
         dateDebutSymptomes: toDateStr(caseData.dateDebutSymptomes),
         dateDiagnostic: toDateStr(caseData.dateDiagnostic),
-        symptomesTexte: caseData.symptomesTexte ?? "",
         observation: caseData.observation ?? undefined,
         modeConfirmation: caseData.modeConfirmation ?? undefined,
         atcd: caseData.atcd ?? "",
         casSimilaire: caseData.casSimilaire ?? false,
-        casSimilaireId: caseData.casSimilaireId ?? "",
         estHospitalise: caseData.estHospitalise ?? false,
         dateHospitalisation: toDateStr(caseData.dateHospitalisation),
         structureHospitalisationId: caseData.structureHospitalisationId ?? "",
@@ -662,6 +688,17 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
       if (Array.isArray(caseData.symptomes)) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setSelectedSymptomeIds(caseData.symptomes.map((s: any) => s.symptomeId))
+      }
+
+      // Pre-fill ATCD multi-select from stored string
+      if (caseData.atcd) {
+        const stored = (caseData.atcd as string).split(",").map((s: string) => s.trim()).filter(Boolean)
+        stored.forEach((a: string) => {
+          if (!ANTECEDENTS_PREDEFINED.includes(a as never)) {
+            setAtcdList(prev => prev.includes(a) ? prev : [...prev, a])
+          }
+        })
+        setSelectedAtcds(stored)
       }
 
       // Pre-fill lieux
@@ -688,18 +725,6 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
         setFicheSpecifiqueSlug(caseData.ficheSpecifiqueType)
       }
 
-      // Pre-fill cas similaire reference
-      if (caseData.casSimilaireRef) {
-        setSelectedCasSimilaire({
-          id: caseData.casSimilaireRef.id,
-          codeCas: caseData.casSimilaireRef.codeCas,
-          statut: "",
-          createdAt: "",
-          maladie: caseData.casSimilaireRef.maladie ?? { nom: "", codeCim10: "" },
-          patient: caseData.casSimilaireRef.patient ?? { firstName: "", lastName: "" },
-        })
-      }
-
       setInitialLoading(false)
     }).catch(err => {
       console.error("Edit mode load error:", err)
@@ -716,7 +741,6 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
       .then(r => r.json())
       .then(caseData => {
         setValue("maladieId", caseData.maladieId ?? "")
-        setValue("symptomesTexte", caseData.symptomesTexte ?? "")
         if (caseData.observation) setValue("observation", caseData.observation)
         if (caseData.modeConfirmation) setValue("modeConfirmation", caseData.modeConfirmation)
         setValue("atcd", caseData.atcd ?? "")
@@ -741,23 +765,6 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
       setFicheSpecifiqueSlug(null)
     }
   }, [maladieId, maladies])
-
-  // Cas similaire search with debounce
-  const searchCasSimilaire = useCallback(async (q: string) => {
-    if (q.length < 2) { setCasSearchResults([]); return }
-    setCasSearchLoading(true)
-    try {
-      const res = await fetch(`/api/cas-search?q=${encodeURIComponent(q)}`)
-      const data = await res.json()
-      setCasSearchResults(data)
-    } catch { setCasSearchResults([]) }
-    finally { setCasSearchLoading(false) }
-  }, [])
-
-  useEffect(() => {
-    const timer = setTimeout(() => searchCasSimilaire(casSearchQuery), 300)
-    return () => clearTimeout(timer)
-  }, [casSearchQuery, searchCasSimilaire])
 
   // ---------------------------------------------------------------------------
   // Build payload helper
@@ -786,10 +793,11 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     lieuTravail: data.lieuTravail || null,
     estEtranger: data.estEtranger ?? null,
     nationalite: data.nationalite || null,
-    symptomesTexte: data.symptomesTexte || null,
+    asymptomatique: data.asymptomatique ?? null,
     observation: data.observation || null,
     atcd: data.atcd || null,
     casSimilaire: data.casSimilaire ?? null,
+    nombreCasSimilaires: data.nombreCasSimilaires ?? null,
     estHospitalise: data.estHospitalise ?? null,
     dateHospitalisation: data.dateHospitalisation || null,
     estEvacue: data.estEvacue ?? null,
@@ -808,7 +816,6 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     ficheSpecifiqueType: ficheSpecifiqueSlug || null,
     donneesSpecifiques: ficheSpecifiqueSlug ? (data as Record<string, unknown>).fiche ?? null : null,
     nationaliteCode: data.nationaliteCode || null,
-    casSimilaireId: selectedCasSimilaire?.id || null,
     structureHospitalisationId: data.structureHospitalisationId || null,
     serviceHospitalisation: data.serviceHospitalisation || null,
     symptomeIds: selectedSymptomeIds,
@@ -991,6 +998,88 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     setSelectedSymptomeIds(prev =>
       prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
     )
+  }
+
+  // ---------------------------------------------------------------------------
+  // Add new symptom to DB
+  // ---------------------------------------------------------------------------
+  const addNewSymptom = async () => {
+    if (!newSymptomNom.trim() || newSymptomNom.trim().length < 2) return
+    setNewSymptomLoading(true)
+    try {
+      const res = await fetch("/api/symptomes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nom: newSymptomNom.trim(), categorie: newSymptomCategorie || null }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        toast.error(err.error ?? "Erreur lors de l'ajout du symptôme")
+        return
+      }
+      const newSymp: SymptomeRef = await res.json()
+      setSymptomes(prev => [...prev, newSymp].sort((a, b) => a.nom.localeCompare(b.nom)))
+      setSelectedSymptomeIds(prev => [...prev, newSymp.id])
+      setNewSymptomNom("")
+      setNewSymptomCategorie("")
+      toast.success(`Symptôme "${newSymp.nom}" ajouté`)
+    } catch {
+      toast.error("Erreur lors de l'ajout du symptôme")
+    } finally {
+      setNewSymptomLoading(false)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Add new germe to DB
+  // ---------------------------------------------------------------------------
+  const addNewGerme = async () => {
+    if (!newGermeNom.trim() || newGermeNom.trim().length < 2) return
+    setNewGermeLoading(true)
+    try {
+      const res = await fetch("/api/germes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nom: newGermeNom.trim(), code: newGermeCode.trim() || "U82.8" }),
+      })
+      if (!res.ok) {
+        const err = await res.json()
+        toast.error(err.error ?? "Erreur lors de l'ajout du germe")
+        return
+      }
+      const newG: GermeRef = await res.json()
+      setGermes(prev => [...prev, newG].sort((a, b) => a.nom.localeCompare(b.nom)))
+      setNewGermeNom("")
+      setNewGermeCode("")
+      toast.success(`Germe "${newG.nom}" ajouté`)
+    } catch {
+      toast.error("Erreur lors de l'ajout du germe")
+    } finally {
+      setNewGermeLoading(false)
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // ATCD helpers
+  // ---------------------------------------------------------------------------
+  const toggleAtcd = (item: string) => {
+    setSelectedAtcds(prev => {
+      const next = prev.includes(item) ? prev.filter(a => a !== item) : [...prev, item]
+      setValue("atcd", next.join(", "))
+      return next
+    })
+  }
+
+  const addNewAtcd = () => {
+    const trimmed = atcdSearch.trim()
+    if (!trimmed || trimmed.length < 2) return
+    if (!atcdList.includes(trimmed)) setAtcdList(prev => [...prev, trimmed])
+    setSelectedAtcds(prev => {
+      const next = prev.includes(trimmed) ? prev : [...prev, trimmed]
+      setValue("atcd", next.join(", "))
+      return next
+    })
+    setAtcdSearch("")
   }
 
   // ---------------------------------------------------------------------------
@@ -1222,32 +1311,37 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
 
             {/* Wilaya */}
             <div>
-              <label className="label">Wilaya de résidence</label>
-              <select {...register("wilayadId")} className={inputCls(false)}>
-                <option value="">Sélectionner une wilaya...</option>
-                {wilayas.map(w => <option key={w.id} value={w.id}>{w.nom}</option>)}
-              </select>
+              <label className="label">Wilaya de résidence <span className="text-red-500">*</span></label>
+              <SearchableSelect
+                options={wilayas.map(w => ({ value: w.id, label: `${w.code} — ${w.nom}` }))}
+                value={watch("wilayadId") ?? ""}
+                onChange={val => setValue("wilayadId", val, { shouldValidate: true })}
+                placeholder="Rechercher une wilaya..."
+              />
+              <FieldError msg={errors.wilayadId?.message} />
             </div>
 
             {/* Commune */}
             <div>
-              <label className="label">Commune</label>
-              <select {...register("communeId")} className={inputCls(false)}>
-                <option value="">Sélectionner une commune...</option>
-                {filteredCommunes.map(c => <option key={c.id} value={c.id}>{c.nom}</option>)}
-              </select>
+              <label className="label">Commune <span className="text-red-500">*</span></label>
+              <SearchableSelect
+                options={filteredCommunes.map(c => ({ value: c.id, label: c.nom }))}
+                value={watch("communeId") ?? ""}
+                onChange={val => setValue("communeId", val, { shouldValidate: true })}
+                placeholder={watch("wilayadId") ? "Rechercher une commune..." : "Sélectionner d'abord une wilaya..."}
+              />
+              <FieldError msg={errors.communeId?.message} />
             </div>
 
             {/* Adresse */}
             <div className="col-span-2">
-              <label className="label">Adresse complète <span className="text-red-500">*</span></label>
+              <label className="label">Adresse complète</label>
               <textarea
                 {...register("address")}
                 rows={2}
-                className={cn(inputCls(!!errors.address), "h-auto py-2 resize-none")}
+                className={cn(inputCls(false), "h-auto py-2 resize-none")}
                 placeholder="Numéro, rue, quartier..."
               />
-              <FieldError msg={errors.address?.message} />
             </div>
 
             {/* Profession */}
@@ -1288,7 +1382,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
 
             {estEtranger && (
               <div className="col-span-2">
-                <label className="label">Nationalité <span className="text-red-500">*</span></label>
+                <label className="label">Nationalité</label>
                 <SearchableSelect
                   options={NATIONALITIES.map(n => ({ value: n.code, label: n.label }))}
                   value={watch("nationaliteCode") ?? ""}
@@ -1445,72 +1539,117 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
               />
             </div>
 
-            {/* Symptômes codés */}
+            {/* Asymptomatique */}
             <div className="col-span-2">
-              <label className="label">
-                Symptômes codés
-                {relevantSymptomCategories.length > 0 && (
-                  <span className="ml-2 text-[11px] text-blue-500 font-normal">
-                    (filtrés pour {selectedMaladie?.nomCourt ?? selectedMaladie?.nom})
-                  </span>
-                )}
+              <label className={cn(
+                "flex items-center gap-3 px-4 py-3 rounded-lg border cursor-pointer transition-all text-sm",
+                asymptomatique
+                  ? "border-amber-400 bg-amber-50 text-amber-800 font-medium"
+                  : "border-gray-200 text-gray-600 hover:border-gray-300"
+              )}>
+                <input
+                  type="checkbox"
+                  checked={!!asymptomatique}
+                  onChange={e => {
+                    setValue("asymptomatique", e.target.checked)
+                    if (e.target.checked) setSelectedSymptomeIds([])
+                  }}
+                  className="rounded border-gray-300 text-amber-500 focus:ring-amber-400"
+                />
+                Asymptomatique (aucun symptôme)
               </label>
-              {selectedSymptomeIds.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {selectedSymptomeIds.map(id => {
-                    const s = symptomes.find(x => x.id === id)
-                    if (!s) return null
-                    return (
-                      <span key={id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
-                        {s.nom}
-                        <button type="button" onClick={() => toggleSymptome(id)} className="hover:text-blue-900">
-                          <X size={12} />
-                        </button>
-                      </span>
-                    )
-                  })}
-                </div>
-              )}
-              <div className="border border-gray-200 rounded-lg max-h-52 overflow-y-auto">
-                {symptomesByCategory.map(cat => (
-                  <div key={cat.key}>
-                    <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-100 sticky top-0">
-                      {cat.label}
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-2 px-3 py-1.5">
-                      {cat.items.map(s => (
-                        <label
-                          key={s.id}
-                          className={cn(
-                            "flex items-center gap-2 px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-gray-50 transition-colors",
-                            selectedSymptomeIds.includes(s.id) && "bg-blue-50"
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedSymptomeIds.includes(s.id)}
-                            onChange={() => toggleSymptome(s.id)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="text-gray-700">{s.nom}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
 
-            {/* Free text symptômes */}
-            <div className="col-span-2">
-              <label className="label">Symptômes supplémentaires (texte libre)</label>
-              <textarea
-                {...register("symptomesTexte")}
-                rows={2}
-                className={cn(inputCls(false), "h-auto py-2 resize-none")}
-                placeholder="Symptômes non listés ci-dessus..."
-              />
-            </div>
+            {/* Symptômes codés */}
+            {!asymptomatique && (
+              <div className="col-span-2">
+                <label className="label">
+                  Symptômes codés
+                  {relevantSymptomCategories.length > 0 && (
+                    <span className="ml-2 text-[11px] text-blue-500 font-normal">
+                      (filtrés pour {selectedMaladie?.nomCourt ?? selectedMaladie?.nom})
+                    </span>
+                  )}
+                </label>
+                {selectedSymptomeIds.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {selectedSymptomeIds.map(id => {
+                      const s = symptomes.find(x => x.id === id)
+                      if (!s) return null
+                      return (
+                        <span key={id} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                          {s.nom}
+                          <button type="button" onClick={() => toggleSymptome(id)} className="hover:text-blue-900">
+                            <X size={12} />
+                          </button>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
+                <div className="border border-gray-200 rounded-lg max-h-52 overflow-y-auto">
+                  {symptomesByCategory.map(cat => (
+                    <div key={cat.key}>
+                      <div className="px-3 py-1.5 text-[11px] font-semibold text-gray-500 uppercase tracking-wider bg-gray-50 border-b border-gray-100 sticky top-0">
+                        {cat.label}
+                      </div>
+                      <div className="grid grid-cols-2 gap-x-2 px-3 py-1.5">
+                        {cat.items.map(s => (
+                          <label
+                            key={s.id}
+                            className={cn(
+                              "flex items-center gap-2 px-2 py-1.5 rounded text-sm cursor-pointer hover:bg-gray-50 transition-colors",
+                              selectedSymptomeIds.includes(s.id) && "bg-blue-50"
+                            )}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selectedSymptomeIds.includes(s.id)}
+                              onChange={() => toggleSymptome(s.id)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-gray-700">{s.nom}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Add new symptom */}
+                <div className="mt-3 p-3 rounded-lg border border-dashed border-gray-300 bg-gray-50/50">
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Ajouter un nouveau symptôme</p>
+                  <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 130px auto" }}>
+                    <input
+                      type="text"
+                      value={newSymptomNom}
+                      onChange={e => setNewSymptomNom(e.target.value)}
+                      placeholder="Nom du symptôme..."
+                      className="input text-sm"
+                    />
+                    <select
+                      value={newSymptomCategorie}
+                      onChange={e => setNewSymptomCategorie(e.target.value)}
+                      className="input text-sm"
+                    >
+                      <option value="">Catégorie...</option>
+                      {SYMPTOM_CATEGORIES.map(c => (
+                        <option key={c.key} value={c.key}>{c.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={addNewSymptom}
+                      disabled={newSymptomLoading || newSymptomNom.trim().length < 2}
+                      className="btn btn-secondary btn-sm disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {newSymptomLoading ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                      Ajouter
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Observation — drives statut */}
             <div className="col-span-2">
@@ -1578,12 +1717,77 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
             {/* ATCD */}
             <div className="col-span-2">
               <label className="label">ATCD (Antécédents médicaux)</label>
-              <textarea
-                {...register("atcd")}
-                rows={2}
-                className={cn(inputCls(false), "h-auto py-2 resize-none")}
-                placeholder="Antécédents médicaux pertinents..."
-              />
+              {selectedAtcds.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {selectedAtcds.map(a => (
+                    <span key={a} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-purple-50 text-purple-700 border border-purple-200">
+                      {a}
+                      <button type="button" onClick={() => toggleAtcd(a)} className="hover:text-purple-900"><X size={11} /></button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => { setShowAtcdDropdown(v => !v); setAtcdSearch("") }}
+                  className="input w-full text-left flex items-center justify-between text-sm"
+                >
+                  <span className="text-gray-400">{selectedAtcds.length === 0 ? "Sélectionner ou ajouter des antécédents..." : `${selectedAtcds.length} sélectionné(s)`}</span>
+                  <ChevronDown size={14} className="text-gray-400 shrink-0" />
+                </button>
+                {showAtcdDropdown && (
+                  <div className="absolute z-50 bottom-full mb-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden flex flex-col">
+                    <div className="p-2 border-b border-gray-100">
+                      <div className="relative">
+                        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          value={atcdSearch}
+                          onChange={e => setAtcdSearch(e.target.value)}
+                          placeholder="Rechercher ou ajouter..."
+                          className="input w-full pl-8 text-sm"
+                          autoFocus
+                        />
+                      </div>
+                    </div>
+                    <div className="overflow-y-auto max-h-48">
+                      {atcdList.filter(a => a.toLowerCase().includes(atcdSearch.toLowerCase())).map(a => (
+                        <button
+                          key={a}
+                          type="button"
+                          onClick={() => toggleAtcd(a)}
+                          className={cn(
+                            "w-full text-left px-3 py-2 text-sm flex items-center gap-2 hover:bg-gray-50 transition-colors",
+                            selectedAtcds.includes(a) && "bg-purple-50 text-purple-700 font-medium"
+                          )}
+                        >
+                          <span className={cn(
+                            "w-4 h-4 rounded border flex items-center justify-center shrink-0 text-[10px]",
+                            selectedAtcds.includes(a) ? "bg-purple-600 border-purple-600 text-white" : "border-gray-300"
+                          )}>
+                            {selectedAtcds.includes(a) && "✓"}
+                          </span>
+                          {a}
+                        </button>
+                      ))}
+                      {atcdSearch.trim().length >= 2 && !atcdList.some(a => a.toLowerCase() === atcdSearch.toLowerCase()) && (
+                        <button
+                          type="button"
+                          onClick={() => { addNewAtcd(); setShowAtcdDropdown(false) }}
+                          className="w-full text-left px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 flex items-center gap-2 border-t border-gray-100"
+                        >
+                          <Plus size={13} />
+                          Ajouter &quot;{atcdSearch.trim()}&quot;
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {showAtcdDropdown && (
+                  <div className="fixed inset-0 z-40" onClick={() => setShowAtcdDropdown(false)} />
+                )}
+              </div>
             </div>
 
             {/* Cas similaire */}
@@ -1591,60 +1795,20 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
               <label className="label">Cas similaire dans l&apos;entourage</label>
               <ToggleGroup value={casSimilaire} onChange={val => {
                 setValue("casSimilaire", val)
-                if (!val) { setSelectedCasSimilaire(null); setValue("casSimilaireId", "") }
+                if (!val) setValue("nombreCasSimilaires", undefined)
               }} />
             </div>
 
             {casSimilaire && (
               <div className="col-span-2">
-                <label className="label">Lier à un cas existant (optionnel)</label>
-                {selectedCasSimilaire ? (
-                  <div className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-blue-900">
-                        {selectedCasSimilaire.codeCas} — {selectedCasSimilaire.patient.lastName} {selectedCasSimilaire.patient.firstName}
-                      </p>
-                      <p className="text-xs text-blue-700">{selectedCasSimilaire.maladie.nom}</p>
-                    </div>
-                    <button type="button" onClick={() => { setSelectedCasSimilaire(null); setValue("casSimilaireId", "") }} className="text-blue-500 hover:text-blue-700">
-                      <X size={16} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="relative">
-                    <div className="relative">
-                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        value={casSearchQuery}
-                        onChange={e => setCasSearchQuery(e.target.value)}
-                        placeholder="Rechercher par code cas, nom du patient..."
-                        className="input w-full pl-9"
-                      />
-                      {casSearchLoading && <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-gray-400" />}
-                    </div>
-                    {casSearchResults.length > 0 && (
-                      <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                        {casSearchResults.map(c => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedCasSimilaire(c)
-                              setValue("casSimilaireId", c.id)
-                              setCasSearchQuery("")
-                              setCasSearchResults([])
-                            }}
-                            className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-50 last:border-0"
-                          >
-                            <p className="text-sm font-medium text-gray-900">{c.codeCas} — {c.patient.lastName} {c.patient.firstName}</p>
-                            <p className="text-xs text-gray-500">{c.maladie.nom} • {new Date(c.createdAt).toLocaleDateString("fr-FR")}</p>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
+                <label className="label">Nombre de cas similaires dans l&apos;entourage</label>
+                <input
+                  type="number"
+                  min={1}
+                  {...register("nombreCasSimilaires", { valueAsNumber: true })}
+                  className={inputCls(false)}
+                  placeholder="Ex: 2"
+                />
               </div>
             )}
           </div>
@@ -1732,10 +1896,10 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
                   <div>
                     <label className="label">Germe identifié</label>
                     <SearchableSelect
-                      options={germes.map(g => ({ value: g.id, label: g.nom }))}
+                      options={germes.map(g => ({ value: g.id, label: g.code ? `${g.code} — ${g.nom}` : g.nom }))}
                       value={r.germeId}
                       onChange={val => updateResultatLabo(idx, "germeId", val)}
-                      placeholder="Sélectionner un germe..."
+                      placeholder="Rechercher par nom ou code CIM-10..."
                     />
                   </div>
                   <div>
@@ -1762,6 +1926,36 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
                 </div>
               </div>
             ))}
+
+            {/* Add new germe */}
+            <div className="p-3 rounded-lg border border-dashed border-gray-300 bg-gray-50/50">
+              <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Ajouter un nouveau germe à la liste</p>
+              <div className="grid gap-2" style={{ gridTemplateColumns: "1fr 120px auto" }}>
+                <input
+                  type="text"
+                  value={newGermeNom}
+                  onChange={e => setNewGermeNom(e.target.value)}
+                  placeholder="Nom du germe (ex: Klebsiella oxytoca)..."
+                  className="input text-sm"
+                />
+                <input
+                  type="text"
+                  value={newGermeCode}
+                  onChange={e => setNewGermeCode(e.target.value)}
+                  placeholder="Code CIM-10..."
+                  className="input text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={addNewGerme}
+                  disabled={newGermeLoading || newGermeNom.trim().length < 2}
+                  className="btn btn-secondary btn-sm disabled:opacity-50 whitespace-nowrap"
+                >
+                  {newGermeLoading ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                  Ajouter
+                </button>
+              </div>
+            </div>
 
             <button type="button" onClick={addResultatLabo} className="btn btn-secondary btn-sm">
               <Plus size={14} />

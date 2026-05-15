@@ -6,7 +6,7 @@ import { exportAnalysesPdf, type AnalyticsPdfData } from "@/utils/export-pdf"
 import { exportAnalysesExcel, type AnalyticsExcelData } from "@/utils/export-excel"
 
 interface AnalyticsData {
-  summary: { total: number; confirmes: number; tauxConfirmation: number; maladiesActives: number }
+  summary: { total: number; confirmes: number; tauxConfirmation: number; maladiesDeclarees: number; totalMaladies: number; communesTouchees: number }
   prevalence: { name: string; count: number }[]
   weeklyTrend: { date: string; count: number }[]
   ageDistribution: { name: string; count: number }[]

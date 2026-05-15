@@ -340,7 +340,7 @@ model CasLieu {
 model Germe {
   id       String  @id @default(uuid())
   nom      String  @unique
-  code     String  @unique           // e.g. "SALMONELLA_TYPHI"
+  code     String                    // CIM-10 code (not unique — multiple germes can share a code)
   type     String?                   // "bacterie" | "virus" | "parasite" | "champignon"
   isActive Boolean @default(true) @map("is_active")
 
