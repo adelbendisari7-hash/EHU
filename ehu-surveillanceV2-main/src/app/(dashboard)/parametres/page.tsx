@@ -1,9 +1,9 @@
 import Link from "next/link"
 
 const SETTINGS_SECTIONS = [
-  { href: "/parametres/protocoles", label: "Protocoles Médicaux", desc: "Conduites médicales, actions administratives et étapes d'investigation par maladie", badge: "Nouveau" },
-  { href: "/parametres/seuils", label: "Seuils d'Alerte", desc: "Configurer les seuils de déclenchement automatique par maladie et périmètre", badge: "Nouveau" },
-  { href: "/parametres/referentiels", label: "Référentiels", desc: "Gérer les symptômes, germes BMR et antécédents utilisés dans les formulaires de déclaration", badge: "Nouveau" },
+  { href: "/parametres/protocoles", label: "Protocoles Médicaux", desc: "Conduites médicales, actions administratives et étapes d'investigation par maladie" },
+  { href: "/parametres/seuils", label: "Seuils d'Alerte", desc: "Configurer les seuils de déclenchement automatique par maladie et périmètre" },
+  { href: "/parametres/referentiels", label: "Référentiels", desc: "Gérer les symptômes, germes BMR et antécédents utilisés dans les formulaires de déclaration" },
   { href: "/parametres/medecins", label: "Médecins Déclarants", desc: "Gérer la liste des médecins déclarants utilisés dans les fiches de déclaration" },
   { href: "/parametres/maladies", label: "Maladies MDO", desc: "Gérer la liste des maladies à déclaration obligatoire" },
   { href: "/parametres/etablissements", label: "Établissements", desc: "Gérer les établissements de santé" },
@@ -24,9 +24,6 @@ export default function ParametresPage() {
           >
             <div className="flex items-center gap-2 mb-1">
               <p className="font-medium text-gray-800">{s.label}</p>
-              {"badge" in s && s.badge && (
-                <span className="text-xs font-medium px-1.5 py-0.5 rounded text-white" style={{ backgroundColor: "#27AE60" }}>{s.badge}</span>
-              )}
             </div>
             <p className="text-sm text-gray-500">{s.desc}</p>
           </Link>

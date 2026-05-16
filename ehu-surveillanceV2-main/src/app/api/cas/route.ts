@@ -127,10 +127,12 @@ export async function POST(req: Request) {
       medecinDeclarantId = med.id
     }
 
-    // Derive statut from observation or use provided statut
+    // Derive statut from observation, unless caller explicitly set brouillon
     let statut: string = body.statut || "suspect"
-    if (body.observation === "cas_confirme") statut = "confirme"
-    else if (body.observation === "cas_suspect") statut = "suspect"
+    if (statut !== "brouillon") {
+      if (body.observation === "cas_confirme") statut = "confirme"
+      else if (body.observation === "cas_suspect") statut = "suspect"
+    }
 
     // Create case
     const data = body

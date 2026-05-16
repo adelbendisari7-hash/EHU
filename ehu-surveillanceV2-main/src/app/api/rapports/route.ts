@@ -51,7 +51,6 @@ export async function POST(req: Request) {
 
     const baseWhere = {
       createdAt: { gte: since, lte: until },
-      deletedAt: null,
       ...(servicesFilter.length ? { service: { in: servicesFilter } } : {}),
     }
 

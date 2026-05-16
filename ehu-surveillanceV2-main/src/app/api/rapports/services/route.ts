@@ -8,7 +8,7 @@ export async function GET() {
 
   const rows = await prisma.casDeclare.groupBy({
     by: ["service"],
-    where: { service: { not: null }, deletedAt: null },
+    where: { service: { not: null } },
     orderBy: { service: "asc" },
   })
 
