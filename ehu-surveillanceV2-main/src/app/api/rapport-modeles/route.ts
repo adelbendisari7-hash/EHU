@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
+import { writeAudit, getIp } from "@/lib/audit"
 
 // Templates are stored in the Rapport table with donnees.isTemplate = true
 // and a sentinel date range of 1970-01-01 to 1970-01-01
@@ -65,6 +66,15 @@ export async function POST(req: Request) {
       generePar: "utilisateur",
       createdBy: session.user.id,
     },
+  })
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "CREATE",
+    entity: "RapportModele",
+    entityId: template.id,
+    details: { titre, type },
+    ip: getIp(req),
   })
 
   return NextResponse.json({ template }, { status: 201 })

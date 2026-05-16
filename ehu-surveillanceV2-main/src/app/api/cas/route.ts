@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { generateCaseCode, generatePatientId } from "@/utils/generate-id"
+import { writeAudit, getIp } from "@/lib/audit"
 
 export async function GET(req: Request) {
   const session = await auth()
@@ -238,6 +239,16 @@ export async function POST(req: Request) {
         })),
       })
     }
+
+    // Audit log
+    await writeAudit({
+      userId: session.user.id,
+      action: "CREATE",
+      entity: "CasDeclare",
+      entityId: cas.id,
+      details: { statut, codeCas: cas.codeCas, maladieId: body.maladieId ?? null },
+      ip: getIp(req),
+    })
 
     // Skip alert checking for drafts
     if (statut === "brouillon") {

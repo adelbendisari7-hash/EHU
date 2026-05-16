@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
+import { writeAudit, getIp } from "@/lib/audit"
 
 export async function GET(req: Request) {
   const session = await auth()
@@ -174,6 +175,15 @@ export async function POST(req: Request) {
         statut: "genere",
         wilayadId: body.wilayadId ?? null,
       },
+    })
+
+    await writeAudit({
+      userId: session.user.id,
+      action: "CREATE",
+      entity: "Rapport",
+      entityId: rapport.id,
+      details: { type: body.type, titre: titreAvecService, modeleId },
+      ip: getIp(req),
     })
 
     return NextResponse.json(rapport, { status: 201 })

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { checkAndTriggerThresholds } from "@/lib/check-thresholds"
+import { writeAudit, getIp } from "@/lib/audit"
 
 export async function GET(_req: Request, { params }: { params: Promise<{ casId: string }> }) {
   const session = await auth()
@@ -197,6 +198,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ casId:
       void checkAndTriggerThresholds(cas.maladieId, cId).catch(() => { /* non-blocking */ })
     }
 
+    await writeAudit({
+      userId: session.user.id,
+      action: "UPDATE",
+      entity: "CasDeclare",
+      entityId: casId,
+      details: { statut: statut ?? undefined, maladieId: body.maladieId ?? undefined },
+      ip: getIp(req),
+    })
+
     return NextResponse.json(cas)
   } catch (err) {
     console.error("PATCH /api/cas error:", err)
@@ -204,7 +214,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ casId:
   }
 }
 
-export async function DELETE(_req: Request, { params }: { params: Promise<{ casId: string }> }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ casId: string }> }) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
   if (session.user.role !== "admin") return NextResponse.json({ error: "Admin requis" }, { status: 403 })
@@ -212,5 +222,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ casI
   const { casId } = await params
 
   await prisma.casDeclare.delete({ where: { id: casId } })
+  await writeAudit({ userId: session.user.id, action: "DELETE", entity: "CasDeclare", entityId: casId, ip: getIp(req) })
   return NextResponse.json({ success: true })
 }

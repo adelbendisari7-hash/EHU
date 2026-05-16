@@ -33,6 +33,9 @@ const ENTITY_LABELS: Record<string, string> = {
   SeuilAlerte: "Seuil d'alerte",
   Maladie: "Maladie",
   Notification: "Notification",
+  Rapport: "Rapport",
+  RapportModele: "Modèle de rapport",
+  Role: "Rôle",
 }
 
 function actionLabel(action: string) {
@@ -85,7 +88,7 @@ export default function HistoriquePage() {
   }
 
   const hasFilters = search || entityFilter || dateDebut || dateFin
-  const entities = ["CasDeclare", "User", "Investigation", "Alerte", "SeuilAlerte", "Maladie"]
+  const entities = ["CasDeclare", "Rapport", "RapportModele", "Investigation", "Alerte", "Role", "User", "SeuilAlerte", "Maladie"]
 
   return (
     <div>

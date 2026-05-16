@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
+import { writeAudit, getIp } from "@/lib/audit"
 
 export async function GET() {
   const session = await auth()
@@ -42,8 +43,14 @@ export async function POST(req: Request) {
     include: { cas: { include: { patient: true, maladie: true } }, contacts: true },
   })
 
-  // Keep case status as-is when investigation is created
-
+  await writeAudit({
+    userId: session.user.id,
+    action: "CREATE",
+    entity: "Investigation",
+    entityId: investigation.id,
+    details: { casId: body.casId },
+    ip: getIp(req),
+  })
 
   return NextResponse.json(investigation, { status: 201 })
 }
