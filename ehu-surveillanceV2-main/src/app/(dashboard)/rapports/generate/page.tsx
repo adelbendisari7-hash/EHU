@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { ChevronDown, X, Check, FileText } from "lucide-react"
 
 const TYPES = [
   { value: "personnalise", label: "Personnalisé", desc: "Choisissez vos propres dates" },
@@ -12,16 +13,136 @@ const TYPES = [
   { value: "annuel", label: "Annuel", desc: "Année complète" },
 ]
 
+const DEFAULT_SERVICES = [
+  "Médecine interne", "Pédiatrie", "Chirurgie générale", "Maternité / Gynécologie-obstétrique",
+  "Cardiologie", "Pneumologie", "Neurologie", "Urgences", "Réanimation",
+  "Infectiologie", "Dermatologie", "ORL", "Ophtalmologie", "Traumatologie / Orthopédie",
+  "Hématologie", "Oncologie", "Gastro-entérologie", "Endocrinologie", "Psychiatrie", "Urologie",
+]
+
+interface Template {
+  id: string
+  titre: string
+  type: string
+  sections: string[]
+  description: string
+}
+
+function MultiSelectServices({
+  options,
+  selected,
+  onChange,
+}: {
+  options: string[]
+  selected: string[]
+  onChange: (v: string[]) => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  const toggle = (s: string) => {
+    onChange(selected.includes(s) ? selected.filter(x => x !== s) : [...selected, s])
+  }
+
+  const label = selected.length === 0
+    ? "Tous les services"
+    : selected.length === 1
+    ? selected[0]
+    : `${selected.length} services sélectionnés`
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full h-10 px-3 flex items-center justify-between rounded-lg border border-gray-200 text-sm bg-white focus:outline-none focus:border-[#1B4F8A] transition-colors"
+      >
+        <span className={selected.length === 0 ? "text-gray-400" : "text-gray-800"}>{label}</span>
+        <ChevronDown size={14} className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {selected.map(s => (
+            <span key={s} className="flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-[#1B4F8A] text-xs rounded-md border border-blue-100">
+              {s}
+              <button type="button" onClick={() => toggle(s)} className="hover:text-blue-800">
+                <X size={10} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div className="absolute z-20 mt-1 w-full bg-white border border-gray-200 rounded-xl shadow-lg py-1 max-h-56 overflow-y-auto">
+          <button
+            type="button"
+            onClick={() => { onChange([]); setOpen(false) }}
+            className="w-full text-left px-3 py-2 text-sm text-gray-500 hover:bg-gray-50 border-b border-gray-100"
+          >
+            Tous les services (aucun filtre)
+          </button>
+          {options.map(s => (
+            <label key={s} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer">
+              <div
+                className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                  selected.includes(s) ? "border-[#1B4F8A]" : "border-gray-300"
+                }`}
+                style={selected.includes(s) ? { backgroundColor: "#1B4F8A", borderColor: "#1B4F8A" } : {}}
+                onClick={() => toggle(s)}
+              >
+                {selected.includes(s) && <Check size={10} className="text-white" />}
+              </div>
+              <span className="text-sm text-gray-700">{s}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function GenerateRapportPage() {
   const router = useRouter()
   const [type, setType] = useState("mensuel")
   const [dateDebut, setDateDebut] = useState("")
   const [dateFin, setDateFin] = useState("")
-  const [service, setService] = useState("")
+  const [selectedServices, setSelectedServices] = useState<string[]>([])
+  const [serviceOptions, setServiceOptions] = useState<string[]>(DEFAULT_SERVICES)
+  const [templates, setTemplates] = useState<Template[]>([])
+  const [selectedModele, setSelectedModele] = useState<Template | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Auto-fill dates for preset types
+  useEffect(() => {
+    // Load templates and existing services in parallel
+    Promise.all([
+      fetch("/api/rapport-modeles").then(r => r.json()),
+      fetch("/api/rapports/services").then(r => r.json()),
+    ]).then(([modeleData, svcData]) => {
+      setTemplates((modeleData as { templates: Template[] }).templates ?? [])
+      const fetched = (svcData as { services: string[] }).services ?? []
+      if (fetched.length > 0) {
+        // Merge fetched services with defaults, dedup
+        const merged = Array.from(new Set([...fetched, ...DEFAULT_SERVICES]))
+        setServiceOptions(merged)
+      }
+    }).catch(() => { /* use defaults silently */ })
+
+    // Default to last month
+    handleTypeChange("mensuel")
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleTypeChange = (t: string) => {
     setType(t)
     const now = new Date()
@@ -52,6 +173,13 @@ export default function GenerateRapportPage() {
     }
   }
 
+  const selectModele = (t: Template | null) => {
+    setSelectedModele(t)
+    if (t && t.type !== "personnalise") {
+      handleTypeChange(t.type)
+    }
+  }
+
   const handleGenerate = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
@@ -60,14 +188,20 @@ export default function GenerateRapportPage() {
       const res = await fetch("/api/rapports", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, dateDebut, dateFin, service: service.trim() || undefined }),
+        body: JSON.stringify({
+          type,
+          dateDebut,
+          dateFin,
+          services: selectedServices,
+          modeleId: selectedModele?.id ?? null,
+        }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error((err as { error?: string }).error ?? "Erreur lors de la génération")
       }
       const rapport = await res.json()
-      router.push(`/rapports/${rapport.id}`)
+      router.push(`/rapports/${(rapport as { id: string }).id}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur inconnue")
     } finally {
@@ -86,6 +220,72 @@ export default function GenerateRapportPage() {
       </div>
 
       <form onSubmit={handleGenerate} className="max-w-xl space-y-5">
+
+        {/* Template selector */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">
+            Modèle de Rapport <span className="font-normal text-gray-400">(optionnel)</span>
+          </h2>
+          <p className="text-xs text-gray-400 mb-3">Sélectionner un modèle pré-configure le type et les sections à inclure</p>
+
+          {templates.length === 0 ? (
+            <p className="text-xs text-gray-400 italic">
+              Aucun modèle disponible —{" "}
+              <Link href="/rapports/modeles" className="text-[#1B4F8A] hover:underline">en créer un</Link>
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {/* "Sans modèle" option */}
+              <label className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                selectedModele === null ? "border-[#1B4F8A] bg-blue-50" : "border-gray-100 hover:border-gray-200"
+              }`}>
+                <input
+                  type="radio"
+                  name="modele"
+                  checked={selectedModele === null}
+                  onChange={() => selectModele(null)}
+                  className="accent-[#1B4F8A]"
+                />
+                <span className="text-sm text-gray-600">Sans modèle (configuration manuelle)</span>
+              </label>
+
+              {templates.map(t => (
+                <label key={t.id} className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                  selectedModele?.id === t.id ? "border-[#1B4F8A] bg-blue-50" : "border-gray-100 hover:border-gray-200"
+                }`}>
+                  <input
+                    type="radio"
+                    name="modele"
+                    checked={selectedModele?.id === t.id}
+                    onChange={() => selectModele(t)}
+                    className="accent-[#1B4F8A] mt-0.5"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <FileText size={13} style={{ color: "#1B4F8A" }} />
+                      <p className="text-sm font-medium text-gray-800">{t.titre}</p>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded capitalize">{t.type}</span>
+                    </div>
+                    {t.description && (
+                      <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>
+                    )}
+                    {t.sections.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {t.sections.slice(0, 4).map(s => (
+                          <span key={s} className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded">{s}</span>
+                        ))}
+                        {t.sections.length > 4 && (
+                          <span className="text-[10px] px-1.5 py-0.5 bg-gray-100 text-gray-400 rounded">+{t.sections.length - 4}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Type selection */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <h2 className="text-sm font-semibold text-gray-700 mb-4">Type de Rapport</h2>
@@ -117,16 +317,16 @@ export default function GenerateRapportPage() {
           </div>
         </div>
 
-        {/* Service filter */}
+        {/* Multi-select services */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-1">Filtre par Service <span className="font-normal text-gray-400">(optionnel)</span></h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">
+            Filtre par Service <span className="font-normal text-gray-400">(optionnel)</span>
+          </h2>
           <p className="text-xs text-gray-400 mb-3">Laissez vide pour inclure tous les services</p>
-          <input
-            type="text"
-            value={service}
-            onChange={e => setService(e.target.value)}
-            placeholder="Ex: Médecine interne, Pédiatrie..."
-            className={inputCls}
+          <MultiSelectServices
+            options={serviceOptions}
+            selected={selectedServices}
+            onChange={setSelectedServices}
           />
         </div>
 

@@ -39,7 +39,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Dates invalides" }, { status: 400 })
     }
 
-    const serviceFilter = body.service ? String(body.service).trim() : null
+    const servicesFilter: string[] = Array.isArray(body.services)
+      ? body.services.map(String).filter(Boolean)
+      : body.service ? [String(body.service).trim()] : []
+
+    const modeleId: string | null = body.modeleId ?? null
 
     const since = dateDebut
     const until = new Date(dateFin)
@@ -47,7 +51,8 @@ export async function POST(req: Request) {
 
     const baseWhere = {
       createdAt: { gte: since, lte: until },
-      ...(serviceFilter ? { service: { contains: serviceFilter } } : {}),
+      deletedAt: null,
+      ...(servicesFilter.length ? { service: { in: servicesFilter } } : {}),
     }
 
     const [totalCas, casByMaladieRaw, casByCommuneRaw, casByServiceRaw, weeklyRaw, ageRaw, statutRaw, totalAlertes, totalInvestigations] =
@@ -129,7 +134,8 @@ export async function POST(req: Request) {
         tauxConfirmation: totalCas > 0 ? Math.round((confirmes / totalCas) * 100) : 0,
         alertes: totalAlertes,
         investigations: totalInvestigations,
-        serviceFiltre: serviceFilter || null,
+        servicesFiltre: servicesFilter.length ? servicesFilter : null,
+        modeleId,
       },
       casByMaladie: casByMaladieRaw.map(r => ({ maladie: maladieMap[r.maladieId ?? ""] ?? "—", count: r._count._all })),
       casByCommune: casByCommuneRaw.map(r => ({ commune: communeMap[r.communeId ?? ""] ?? "—", count: r._count._all })),
@@ -153,7 +159,9 @@ export async function POST(req: Request) {
       ? `Rapport Annuel — ${dateDebut.getFullYear()}`
       : `Rapport Personnalisé — ${dateDebut.toLocaleDateString("fr-FR")} au ${dateFin.toLocaleDateString("fr-FR")}`
 
-    const titreAvecService = serviceFilter ? `${titre} · ${serviceFilter}` : titre
+    const titreAvecService = servicesFilter.length
+      ? `${titre} · ${servicesFilter.join(", ")}`
+      : titre
 
     const rapport = await prisma.rapport.create({
       data: {
