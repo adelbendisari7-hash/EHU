@@ -25,6 +25,7 @@ const NAV_GROUPS: Record<string, string[]> = {
   Alertes: ["/alertes"],
   Administration: ["/utilisateurs", "/roles", "/parametres", "/parametres/historique"],
   Compte: ["/notifications"],
+  "Interface UISTI": ["/uisti/morbidite", "/uisti/mortalite"],
 }
 
 function NavLinks({
@@ -122,6 +123,7 @@ function SidebarFooter({ userName, userRole }: { userName: string; userRole: str
     medecin: "Médecin",
     epidemiologiste: "Épidémiologiste",
     admin: "Administrateur",
+    uisti: "Unité UISTI",
   }
 
   return (

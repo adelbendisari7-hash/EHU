@@ -21,4 +21,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: "Paramètres", href: "/parametres", icon: "Settings", permission: "users.view" },
   { label: "Historique", href: "/parametres/historique", icon: "History", permission: "users.view" },
   { label: "Notifications", href: "/notifications", icon: "Bell", permission: "dashboard.view" },
+  // UISTI
+  { label: "Morbidité Hospitalière", href: "/uisti/morbidite", icon: "Activity", permission: "uisti.morbidite" },
+  { label: "Croisement Mortalité", href: "/uisti/mortalite", icon: "AlertTriangle", permission: "uisti.mortalite" },
 ]

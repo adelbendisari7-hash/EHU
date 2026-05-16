@@ -1,9 +1,11 @@
 import { auth } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
+import { redirect } from "next/navigation"
 import DashboardClient from "@/components/dashboard/dashboard-client"
 
 export default async function DashboardPage() {
   const session = await auth()
+  if (session?.user.role === "uisti") redirect("/uisti/morbidite")
 
   const [maladies, communes, wilayas] = await Promise.all([
     prisma.maladie.findMany({ where: { isActive: true }, orderBy: { nom: "asc" }, select: { id: true, nom: true } }),
