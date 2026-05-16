@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { usePathname } from "next/navigation"
 import Link from "next/link"
+import Image from "next/image"
 import {
   LayoutDashboard, FilePlus, List, Search,
   BarChart, AlertTriangle, Users, Settings, Shield, LogOut, Menu, X, FileBarChart,
@@ -105,8 +106,8 @@ function NavLinks({
 function SidebarLogo() {
   return (
     <div className="flex items-center gap-3 px-5 h-16 border-b shrink-0" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
-      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md" style={{ backgroundColor: "rgba(255,255,255,0.95)" }}>
-        <span className="font-bold text-[11px] tracking-tight" style={{ color: "#1B4F8A" }}>EHU</span>
+      <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-md overflow-hidden" style={{ backgroundColor: "rgba(255,255,255,0.95)" }}>
+        <Image src="/ehu-logo.png" alt="Logo EHU" width={36} height={36} className="object-contain" />
       </div>
       <div className="min-w-0">
         <p className="text-white font-semibold text-[14px] leading-tight">EHU Oran</p>

@@ -6,7 +6,8 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { signIn } from "next-auth/react"
 import { cn } from "@/utils/cn"
-import { Eye, EyeOff, AlertCircle, Loader2, Shield } from "lucide-react"
+import { Eye, EyeOff, AlertCircle, Loader2 } from "lucide-react"
+import Image from "next/image"
 
 const loginSchema = z.object({
   email: z.string().email("Email invalide"),
@@ -71,11 +72,10 @@ export default function LoginPage() {
         {/* Logo + Title */}
         <div className="flex flex-col items-center mb-8">
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 relative"
-            style={{ background: "linear-gradient(140deg, #1B4F8A 0%, #2563EB 100%)", boxShadow: "0 8px 24px rgba(27,79,138,0.35)" }}
+            className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5 overflow-hidden"
+            style={{ background: "rgba(255,255,255,0.95)", boxShadow: "0 8px 24px rgba(27,79,138,0.35)" }}
           >
-            <Shield size={26} className="text-white" />
-            <div className="absolute inset-0 rounded-2xl ring-1 ring-white/15" />
+            <Image src="/ehu-logo.png" alt="Logo EHU" width={72} height={72} className="object-contain" priority />
           </div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Bienvenue</h1>
           <p className="text-[14px] mt-1.5 text-center max-w-[280px] leading-snug" style={{ color: "rgba(255,255,255,0.52)" }}>
