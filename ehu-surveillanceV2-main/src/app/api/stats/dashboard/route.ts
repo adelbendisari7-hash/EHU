@@ -30,7 +30,7 @@ export async function GET(req: Request) {
       }
     : { gte: since }
 
-  const where: Record<string, unknown> = { createdAt: dateFilter }
+  const where: Record<string, unknown> = { createdAt: dateFilter, statut: { not: "brouillon" } }
   if (maladieIds.length === 1) where.maladieId = maladieIds[0]
   else if (maladieIds.length > 1) where.maladieId = { in: maladieIds }
   if (communeIds.length === 1) where.communeId = communeIds[0]
@@ -46,7 +46,7 @@ export async function GET(req: Request) {
   const prevEnd = new Date(bucketStart.getTime() - 1)
   const prevStart = new Date(prevEnd.getTime() - periodMs)
   const prevDateFilter = { gte: prevStart, lte: prevEnd }
-  const prevWhere: Record<string, unknown> = { createdAt: prevDateFilter }
+  const prevWhere: Record<string, unknown> = { createdAt: prevDateFilter, statut: { not: "brouillon" } }
   if (maladieIds.length === 1) prevWhere.maladieId = maladieIds[0]
   else if (maladieIds.length > 1) prevWhere.maladieId = { in: maladieIds }
   if (communeIds.length === 1) prevWhere.communeId = communeIds[0]
@@ -63,13 +63,12 @@ export async function GET(req: Request) {
     casSuspects,
     casPrevPeriode,
   ] = await Promise.all([
-    // Total cas (non-brouillon) dans la période filtrée
-    prisma.casDeclare.count({ where: { ...where, statut: { not: "brouillon" } } }),
+    // Total cas dans la période filtrée (brouillons exclus via where de base)
+    prisma.casDeclare.count({ where }),
     // Cas avec les champs obligatoires remplis
     prisma.casDeclare.count({
       where: {
         ...where,
-        statut: { not: "brouillon" },
         maladieId: { not: null },
         communeId: { not: null },
         dateDiagnostic: { not: null },
@@ -80,8 +79,8 @@ export async function GET(req: Request) {
     prisma.casDeclare.count({ where: { ...where, statut: "confirme" } }),
     // Cas suspects
     prisma.casDeclare.count({ where: { ...where, statut: "suspect" } }),
-    // Période précédente (pour évolution)
-    prisma.casDeclare.count({ where: { ...prevWhere, statut: { not: "brouillon" } } }),
+    // Période précédente
+    prisma.casDeclare.count({ where: prevWhere }),
   ])
 
   const tauxCompletude = nombreCas > 0 ? Math.round((casComplets / nombreCas) * 100) : 0
@@ -147,7 +146,7 @@ export async function GET(req: Request) {
   // ── Wilaya case counts (for choropleth) ─────────────────────────────────────
   const casByCommune = await prisma.casDeclare.groupBy({
     by: ["communeId"],
-    where: { ...where, statut: { not: "brouillon" } },
+    where,
     _count: { id: true },
   })
   const communeIds2 = casByCommune.map(c => c.communeId).filter((id): id is string => Boolean(id))

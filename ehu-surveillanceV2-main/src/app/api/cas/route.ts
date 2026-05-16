@@ -17,15 +17,15 @@ export async function GET(req: Request) {
   const service = searchParams.get("service") ?? ""
 
   const where: Record<string, unknown> = {}
-  // Use notIn with valid enum values so Prisma doesn't throw on legacy DB statuses
-  if (statut === "suspect") {
-    // Everything that is not brouillon or confirme (covers legacy: nouveau, en_cours, infirme)
-    where.statut = { notIn: ["brouillon", "confirme"] }
-  } else if (statut === "confirme") {
-    // Only confirmed cases; legacy "cloture" rows will be visible after migration
-    where.statut = "confirme"
-  } else if (statut === "brouillon") {
+  if (statut === "brouillon") {
     where.statut = "brouillon"
+  } else if (statut === "confirme") {
+    where.statut = "confirme"
+  } else if (statut === "suspect") {
+    where.statut = { notIn: ["brouillon", "confirme"] }
+  } else {
+    // "Tous" — never show brouillons outside their dedicated filter
+    where.statut = { not: "brouillon" }
   }
   if (maladieId) where.maladieId = maladieId
   if (service) where.serviceDeclarant = { contains: service, mode: "insensitive" }

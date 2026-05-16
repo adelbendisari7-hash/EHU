@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   const wilayadIds = wilayadIdsParam ? wilayadIdsParam.split(",").filter(Boolean) : []
   const services = (searchParams.get("services") ?? "").split(",").filter(Boolean)
 
-  const where: Record<string, unknown> = {}
+  const where: Record<string, unknown> = { statut: { not: "brouillon" } }
 
   // Date range — custom dates take priority over period preset
   if (dateDebut || dateFin) {

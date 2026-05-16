@@ -19,7 +19,7 @@ export async function GET(req: Request) {
 
   if (type === "cas") {
     const cas = await prisma.casDeclare.findMany({
-      where: { createdAt: { gte: since } },
+      where: { createdAt: { gte: since }, statut: { not: "brouillon" } },
       orderBy: { createdAt: "desc" },
       include: {
         patient: { select: { firstName: true, lastName: true, dateOfBirth: true, sex: true } },

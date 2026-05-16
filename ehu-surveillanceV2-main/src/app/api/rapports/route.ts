@@ -52,6 +52,7 @@ export async function POST(req: Request) {
 
     const baseWhere = {
       createdAt: { gte: since, lte: until },
+      statut: { not: "brouillon" as const },
       ...(servicesFilter.length ? { service: { in: servicesFilter } } : {}),
     }
 
