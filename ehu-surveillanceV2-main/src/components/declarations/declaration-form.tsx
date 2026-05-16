@@ -864,6 +864,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
         }
         const cas = await res.json()
         toast.success("Déclaration enregistrée avec succès")
+        autoSaveRef.current = true
         if (cas.declenchement) {
           setDeclenchement(cas.declenchement)
           setPendingCasId(cas.id)
@@ -957,6 +958,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
 
       const cas = await res.json()
       toast.success("Brouillon enregistré")
+      autoSaveRef.current = true
       router.push(`/declarations/${cas.id}`)
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Erreur inconnue"
