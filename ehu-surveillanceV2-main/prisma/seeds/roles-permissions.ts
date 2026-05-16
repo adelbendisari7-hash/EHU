@@ -43,6 +43,9 @@ export const PERMISSIONS_SEED = [
   { slug: "seuils.manage", name: "Configurer les seuils d'alerte", module: "seuils" },
   // OCR
   { slug: "ocr.scan", name: "Scanner un formulaire OCR", module: "ocr" },
+  // UISTI
+  { slug: "uisti.morbidite", name: "Accéder à la morbidité hospitalière MDO", module: "uisti" },
+  { slug: "uisti.mortalite", name: "Accéder au croisement mortalité-MDO", module: "uisti" },
 ]
 
 export const ROLES_SEED = [
@@ -77,6 +80,17 @@ export const ROLES_SEED = [
       "protocoles.view", "protocoles.manage",
       "seuils.manage",
       "ocr.scan",
+    ],
+  },
+  {
+    name: "Unité UISTI",
+    slug: "uisti",
+    description: "Unité d'Information Sanitaire et Techniques Informatiques — accès aux données MDO hospitalisées",
+    color: "#B45309",
+    isSystem: true,
+    permissions: [
+      "uisti.morbidite",
+      "uisti.mortalite",
     ],
   },
   {

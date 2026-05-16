@@ -191,10 +191,22 @@ async function main() {
     update: {}, create: { userId: epid.id, roleId: roleIds["epidemiologiste"] },
   })
 
+  const uistiHash = await bcrypt.hash("Uisti@2024", 12)
+  const uisti = await prisma.user.upsert({
+    where: { email: "uisti@ehu-oran.dz" },
+    update: {},
+    create: { email: "uisti@ehu-oran.dz", passwordHash: uistiHash, firstName: "Unité", lastName: "UISTI", etablissementId: ehu.id, wilayadId: oranId, isActive: true },
+  })
+  await prisma.userRole.upsert({
+    where: { userId_roleId: { userId: uisti.id, roleId: roleIds["uisti"] } },
+    update: {}, create: { userId: uisti.id, roleId: roleIds["uisti"] },
+  })
+
   console.log("\nSeed complete!")
   console.log("  admin@ehu-oran.dz     / Admin@1234")
   console.log("  medecin@ehu-oran.dz   / Medecin@1234")
   console.log("  epidemio@ehu-oran.dz  / Epidemio@1234")
+  console.log("  uisti@ehu-oran.dz     / Uisti@2024")
 }
 
 main().catch(console.error).finally(() => prisma.$disconnect())
