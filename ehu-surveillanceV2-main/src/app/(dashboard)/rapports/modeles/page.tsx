@@ -179,9 +179,10 @@ export default function RapportModelesPage() {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 p-6 z-10 max-h-[90vh] overflow-y-auto">
+          <div className="relative flex min-h-full items-start justify-center px-4 pt-20 pb-10">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-base font-semibold text-gray-800">{editTemplate ? "Modifier le modèle" : "Nouveau modèle"}</h2>
               <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
@@ -258,6 +259,7 @@ export default function RapportModelesPage() {
                 {submitting ? "Enregistrement..." : editTemplate ? "Mettre à jour" : "Créer le modèle"}
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}

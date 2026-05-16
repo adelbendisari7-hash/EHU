@@ -64,19 +64,25 @@ export default function RolesPage() {
     if (!selectedRole) return
     setSaving(true)
     try {
-      await fetch(`/api/roles/${selectedRole.id}/permissions`, {
+      const res = await fetch(`/api/roles/${selectedRole.id}/permissions`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ permissionIds: [...editingPermissions] }),
       })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({})) as { error?: string }
+        throw new Error(data.error ?? `Erreur ${res.status}`)
+      }
       toast.success("Permissions mises à jour")
       // Refresh
-      const updated = await fetch("/api/roles").then((r) => r.json())
-      setRoles(updated)
-      const updatedRole = updated.find((r: Role) => r.id === selectedRole.id)
-      if (updatedRole) setSelectedRole(updatedRole)
-    } catch {
-      toast.error("Erreur lors de la sauvegarde")
+      const updated = await fetch("/api/roles").then((r) => r.json()) as Role[]
+      if (Array.isArray(updated)) {
+        setRoles(updated)
+        const updatedRole = updated.find((r) => r.id === selectedRole.id)
+        if (updatedRole) setSelectedRole(updatedRole)
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erreur lors de la sauvegarde")
     } finally {
       setSaving(false)
     }
