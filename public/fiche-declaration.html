@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fiche de Déclaration MDO — EHU Oran</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      font-size: 11px;
+      color: #1a1a1a;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+
+    .page {
+      background: #fff;
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      padding: 12mm 14mm;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.12);
+    }
+
+    /* ── Print button ── */
+    .print-btn {
+      display: block;
+      margin: 0 auto 16px auto;
+      width: 210mm;
+      text-align: right;
+    }
+    .print-btn button {
+      background: #1B4F8A;
+      color: #fff;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 6px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .print-btn button:hover { background: #163f6e; }
+
+    /* ── Header ── */
+    .header {
+      border: 2px solid #1B4F8A;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .header-top {
+      background: #1B4F8A;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      padding: 8px 14px;
+      gap: 12px;
+    }
+    .header-logo {
+      width: 36px;
+      height: 36px;
+      background: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 11px;
+      color: #1B4F8A;
+      flex-shrink: 0;
+    }
+    .header-title { flex: 1; }
+    .header-title h1 { font-size: 14px; font-weight: 700; letter-spacing: 0.3px; }
+    .header-title p { font-size: 10px; opacity: 0.85; margin-top: 1px; }
+    .header-badge {
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.4);
+      border-radius: 4px;
+      padding: 3px 8px;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    .header-meta {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+      background: #f0f4fa;
+    }
+    .header-meta-item {
+      padding: 6px 12px;
+      border-right: 1px solid #d8e5f5;
+    }
+    .header-meta-item:last-child { border-right: none; }
+    .header-meta-item label {
+      display: block;
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #1B4F8A;
+      margin-bottom: 4px;
+    }
+    .header-meta-item .field { border-bottom: 1px solid #b0c4de; min-height: 18px; }
+
+    /* ── Section card ── */
+    .section {
+      border: 1px solid #dde5f0;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+    .section-header {
+      background: #1B4F8A;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+    }
+    .section-letter {
+      background: rgba(255,255,255,0.25);
+      border: 1px solid rgba(255,255,255,0.5);
+      border-radius: 4px;
+      width: 22px;
+      height: 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+    .section-title { font-size: 12px; font-weight: 600; letter-spacing: 0.2px; }
+    .section-body { padding: 10px 12px; }
+
+    /* ── Grid & fields ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px 10px; }
+    .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 10px; }
+    .col-2 { grid-column: span 2; }
+    .col-3 { grid-column: span 3; }
+
+    .field-group { display: flex; flex-direction: column; gap: 3px; }
+    .field-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #4a6080;
+    }
+    .field-label .req { color: #dc2626; }
+    .field-line {
+      border-bottom: 1px solid #b0bec5;
+      min-height: 20px;
+      width: 100%;
+    }
+    .field-line-lg {
+      border-bottom: 1px solid #b0bec5;
+      min-height: 28px;
+      width: 100%;
+    }
+
+    /* ── Toggle / checkbox row ── */
+    .toggle-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .toggle-opt {
+      border: 1px solid #b0c4de;
+      border-radius: 5px;
+      padding: 3px 10px;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #f8fafc;
+    }
+    .toggle-box {
+      width: 12px;
+      height: 12px;
+      border: 1px solid #7090b0;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* ── Radio grid ── */
+    .radio-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+    .radio-opt {
+      border: 1px solid #b0c4de;
+      border-radius: 5px;
+      padding: 3px 10px;
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: #f8fafc;
+    }
+    .radio-circle {
+      width: 12px;
+      height: 12px;
+      border: 1px solid #7090b0;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Subsection (hospitalisation block) ── */
+    .sub-block {
+      background: #f8fafc;
+      border: 1px solid #e0e9f4;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-top: 6px;
+    }
+    .sub-block-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #1B4F8A;
+      margin-bottom: 6px;
+    }
+
+    /* ── Symptom boxes ── */
+    .symptom-area {
+      border: 1px solid #d0dcea;
+      border-radius: 6px;
+      padding: 8px;
+      min-height: 60px;
+      background: #f8fafc;
+    }
+    .symptom-note {
+      font-size: 9px;
+      color: #8099b0;
+      margin-bottom: 5px;
+    }
+    .symptom-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px 10px;
+    }
+    .symptom-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9.5px;
+      color: #333;
+    }
+    .symptom-check {
+      width: 10px;
+      height: 10px;
+      border: 1px solid #7090b0;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* ── Lieu / Labo block ── */
+    .repeat-block {
+      border: 1px dashed #c0d0e0;
+      border-radius: 6px;
+      padding: 8px 10px;
+      margin-bottom: 6px;
+      background: #fafcff;
+    }
+    .repeat-num {
+      font-size: 9px;
+      font-weight: 700;
+      color: #5a7090;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    /* ── Observation radio (large) ── */
+    .obs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .obs-opt {
+      border: 1.5px solid #b0c4de;
+      border-radius: 7px;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      background: #f8fafc;
+    }
+    .obs-circle {
+      width: 14px;
+      height: 14px;
+      border: 1.5px solid #7090b0;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Fiche spécifique note ── */
+    .fiche-note {
+      background: #fff8e1;
+      border: 1px solid #f5c842;
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 10px;
+      color: #7a5700;
+      margin-bottom: 8px;
+    }
+
+    /* ── Signature / Submit bar ── */
+    .submit-bar {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 10px;
+    }
+    .submit-btn {
+      border: 1.5px solid #b0c4de;
+      border-radius: 7px;
+      padding: 9px 10px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: #4a6080;
+      background: #f8fafc;
+    }
+    .submit-btn.primary {
+      background: #1B4F8A;
+      color: #fff;
+      border-color: #1B4F8A;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      margin-top: 12px;
+      padding-top: 8px;
+      border-top: 1px solid #dde5f0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: #8099b0;
+    }
+
+    /* ── Print styles ── */
+    @media print {
+      body { background: #fff; padding: 0; }
+      .page { box-shadow: none; padding: 10mm 12mm; }
+      .print-btn { display: none; }
+      .section { page-break-inside: avoid; }
+    }
+
+    @page { size: A4; margin: 0; }
+  </style>
+</head>
+<body>
+
+<div class="print-btn">
+  <button onclick="window.print()">🖨️ Imprimer / Enregistrer en PDF</button>
+</div>
+
+<div class="page">
+
+  <!-- ══════════════ EN-TÊTE ══════════════ -->
+  <div class="header">
+    <div class="header-top">
+      <div class="header-logo">EHU</div>
+      <div class="header-title">
+        <h1>FICHE DE DÉCLARATION OBLIGATOIRE DE MALADIE (MDO)</h1>
+        <p>Établissement Hospitalier Universitaire d'Oran — Service Épidémiologie</p>
+      </div>
+      <div class="header-badge">CONFIDENTIEL MÉDICAL</div>
+    </div>
+    <div class="header-meta">
+      <div class="header-meta-item">
+        <label>Mois de déclaration</label>
+        <div class="field" style="display:flex;gap:4px;">
+          <span style="font-size:9px;color:#666;">Mois:</span><div style="flex:1;border-bottom:1px solid #b0c4de;min-height:16px;"></div>
+          <span style="font-size:9px;color:#666;margin-left:8px;">Année:</span><div style="flex:1;border-bottom:1px solid #b0c4de;min-height:16px;"></div>
+        </div>
+      </div>
+      <div class="header-meta-item">
+        <label>Médecin déclarant</label>
+        <div class="field"></div>
+      </div>
+      <div class="header-meta-item">
+        <label>Service déclarant</label>
+        <div class="field"></div>
+      </div>
+    </div>
+    <div style="background:#f0f4fa;padding:4px 12px;border-top:1px solid #d8e5f5;display:flex;gap:20px;align-items:center;">
+      <span style="font-size:9px;color:#4a6080;font-weight:700;text-transform:uppercase;">Date de déclaration :</span>
+      <div style="border-bottom:1px solid #b0c4de;width:140px;min-height:16px;"></div>
+      <span style="font-size:9px;color:#4a6080;font-weight:700;text-transform:uppercase;margin-left:20px;">Identifiant du cas :</span>
+      <div style="border-bottom:1px solid #b0c4de;width:160px;min-height:16px;"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SECTION 1 — INFORMATIONS ADMINISTRATIVES ══════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-letter">1</div>
+      <div class="section-title">Informations Administratives du Patient</div>
+    </div>
+    <div class="section-body">
+      <div class="grid-2">
+
+        <div class="field-group">
+          <div class="field-label">Nom <span class="req">*</span></div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Prénom <span class="req">*</span></div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">N° d'Identification Nationale (NIN)</div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Date de naissance</div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group col-2">
+          <div class="field-label">Âge</div>
+          <div style="display:flex;gap:10px;">
+            <div style="display:flex;align-items:center;gap:6px;flex:1;">
+              <div class="field-line" style="flex:1;"></div>
+              <span style="font-size:9px;color:#666;white-space:nowrap;">ans</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex:1;">
+              <div class="field-line" style="flex:1;"></div>
+              <span style="font-size:9px;color:#666;white-space:nowrap;">mois</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;flex:1;">
+              <div class="field-line" style="flex:1;"></div>
+              <span style="font-size:9px;color:#666;white-space:nowrap;">jours</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group col-2">
+          <div class="field-label">Sexe <span class="req">*</span></div>
+          <div class="radio-grid">
+            <div class="radio-opt"><div class="radio-circle"></div> Masculin</div>
+            <div class="radio-opt"><div class="radio-circle"></div> Féminin</div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Wilaya de résidence <span class="req">*</span></div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Commune <span class="req">*</span></div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group col-2">
+          <div class="field-label">Adresse complète</div>
+          <div class="field-line-lg"></div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Profession</div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Téléphone</div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">E-mail</div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Lieu de travail / École</div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group col-2">
+          <div class="field-label">Ressortissant étranger</div>
+          <div class="toggle-row">
+            <div class="toggle-opt"><div class="toggle-box"></div> Oui</div>
+            <div class="toggle-opt"><div class="toggle-box"></div> Non</div>
+            <div style="flex:1;margin-left:10px;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:9px;color:#666;white-space:nowrap;">Si oui, nationalité :</span>
+              <div class="field-line" style="flex:1;"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SECTION 2 — HOSPITALISATION & ÉVACUATION ══════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-letter">2</div>
+      <div class="section-title">Hospitalisation &amp; Évacuation</div>
+    </div>
+    <div class="section-body">
+      <div class="grid-2">
+
+        <div class="field-group col-2">
+          <div class="field-label">Hospitalisation</div>
+          <div class="toggle-row">
+            <div class="toggle-opt"><div class="toggle-box"></div> Oui</div>
+            <div class="toggle-opt"><div class="toggle-box"></div> Non</div>
+          </div>
+        </div>
+
+        <div class="sub-block col-2">
+          <div class="sub-block-label">Si hospitalisé(e) :</div>
+          <div class="grid-3">
+            <div class="field-group">
+              <div class="field-label">Date d'hospitalisation</div>
+              <div class="field-line"></div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Structure d'hospitalisation</div>
+              <div class="field-line"></div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Service hospitalisation</div>
+              <div class="field-line"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group col-2" style="margin-top:6px;">
+          <div class="field-label">Évacuation</div>
+          <div class="toggle-row">
+            <div class="toggle-opt"><div class="toggle-box"></div> Oui</div>
+            <div class="toggle-opt"><div class="toggle-box"></div> Non</div>
+          </div>
+        </div>
+
+        <div class="sub-block col-2">
+          <div class="sub-block-label">Si évacué(e) :</div>
+          <div class="grid-2">
+            <div class="field-group">
+              <div class="field-label">Date d'évacuation</div>
+              <div class="field-line"></div>
+            </div>
+            <div class="field-group">
+              <div class="field-label">Structure d'évacuation</div>
+              <div class="field-line"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group col-2" style="margin-top:6px;">
+          <div class="field-label">Évolution</div>
+          <div class="radio-grid">
+            <div class="radio-opt"><div class="radio-circle"></div> Guérison</div>
+            <div class="radio-opt"><div class="radio-circle"></div> En cours de guérison</div>
+            <div class="radio-opt"><div class="radio-circle"></div> Sortant</div>
+            <div class="radio-opt"><div class="radio-circle"></div> Toujours malade</div>
+            <div class="radio-opt"><div class="radio-circle"></div> Autre</div>
+            <div class="radio-opt"><div class="radio-circle"></div> Décès</div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Date de sortie</div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Date de décès (si applicable)</div>
+          <div class="field-line"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SECTION 3 — DONNÉES CLINIQUES ══════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-letter">3</div>
+      <div class="section-title">Données Cliniques</div>
+    </div>
+    <div class="section-body">
+      <div class="grid-2">
+
+        <div class="field-group col-2">
+          <div class="field-label">Maladie à déclaration obligatoire (MDO) <span class="req">*</span></div>
+          <div style="display:flex;gap:10px;align-items:flex-end;">
+            <div style="flex:2;">
+              <div style="font-size:8.5px;color:#8099b0;margin-bottom:2px;">Nom de la maladie</div>
+              <div class="field-line-lg"></div>
+            </div>
+            <div style="flex:1;">
+              <div style="font-size:8.5px;color:#8099b0;margin-bottom:2px;">Code CIM-10</div>
+              <div class="field-line-lg"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Date d'apparition des symptômes</div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group">
+          <div class="field-label">Date du diagnostic</div>
+          <div class="field-line"></div>
+        </div>
+
+        <div class="field-group col-2">
+          <div class="toggle-row">
+            <div class="toggle-opt" style="background:#fffbeb;border-color:#f5c842;">
+              <div class="toggle-box"></div>
+              Asymptomatique (aucun symptôme)
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group col-2">
+          <div class="field-label">Symptômes codés (cocher les symptômes présents)</div>
+          <div class="symptom-area">
+            <div class="symptom-note">Généraux / Respiratoires / Digestifs / Neurologiques / Cutanés / Cardiovasculaires / Autres</div>
+            <div class="symptom-grid">
+              <div class="symptom-item"><div class="symptom-check"></div> Fièvre</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Céphalées</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Toux</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Dyspnée</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Diarrhée</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Vomissements</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Douleurs abdominales</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Éruption cutanée</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Ictère</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Convulsions</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Raideur de nuque</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Paralysie</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Adénopathie</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Asthénie</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Anorexie</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Frissons</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Myalgies</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Arthralgies</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Autres : ___________</div>
+              <div class="symptom-item"><div class="symptom-check"></div> ____________________</div>
+              <div class="symptom-item"><div class="symptom-check"></div> ____________________</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group col-2">
+          <div class="field-label">Observation (détermine le statut du cas) <span class="req">*</span></div>
+          <div class="obs-grid">
+            <div class="obs-opt" style="border-color:#1B4F8A;background:#EBF1FA;color:#1B4F8A;">
+              <div class="obs-circle" style="border-color:#1B4F8A;"></div>
+              <div>
+                <div>Cas suspect</div>
+                <div style="font-size:8.5px;opacity:0.7;font-weight:400;">Statut → Suspect</div>
+              </div>
+            </div>
+            <div class="obs-opt" style="border-color:#16a34a;background:#f0fdf4;color:#166534;">
+              <div class="obs-circle" style="border-color:#16a34a;"></div>
+              <div>
+                <div>Cas confirmé</div>
+                <div style="font-size:8.5px;opacity:0.7;font-weight:400;">Statut → Confirmé</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group col-2">
+          <div class="field-label">Mode de confirmation (si cas confirmé)</div>
+          <div class="radio-grid">
+            <div class="radio-opt"><div class="radio-circle"></div> Clinique</div>
+            <div class="radio-opt"><div class="radio-circle"></div> Biologique</div>
+            <div class="radio-opt"><div class="radio-circle"></div> Épidémiologique</div>
+          </div>
+        </div>
+
+        <div class="field-group col-2">
+          <div class="field-label">ATCD — Antécédents médicaux</div>
+          <div class="symptom-area" style="min-height:40px;">
+            <div class="symptom-grid">
+              <div class="symptom-item"><div class="symptom-check"></div> Diabète</div>
+              <div class="symptom-item"><div class="symptom-check"></div> HTA</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Insuffisance rénale</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Cardiopathie</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Immunodépression</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Grossesse</div>
+              <div class="symptom-item"><div class="symptom-check"></div> Autres : ___________</div>
+              <div class="symptom-item"><div class="symptom-check"></div> ____________________</div>
+              <div class="symptom-item"><div class="symptom-check"></div> ____________________</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="field-group col-2">
+          <div class="field-label">Cas similaire dans l'entourage</div>
+          <div class="toggle-row">
+            <div class="toggle-opt"><div class="toggle-box"></div> Oui</div>
+            <div class="toggle-opt"><div class="toggle-box"></div> Non</div>
+            <div style="margin-left:10px;display:flex;align-items:center;gap:6px;">
+              <span style="font-size:9px;color:#666;white-space:nowrap;">Si oui, nombre :</span>
+              <div class="field-line" style="width:60px;"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ SECTION 4 — LIEUX FRÉQUENTÉS ══════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-letter">4</div>
+      <div class="section-title">Lieux Fréquentés (pendant la période de contagiosité — max. 4)</div>
+    </div>
+    <div class="section-body">
+
+      <!-- Lieu 1 -->
+      <div class="repeat-block">
+        <div class="repeat-num">Lieu 1</div>
+        <div class="grid-2">
+          <div class="field-group">
+            <div class="field-label">Nom du lieu</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Type de lieu</div>
+            <div class="radio-grid" style="flex-wrap:wrap;gap:3px;">
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Domicile</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> École</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Travail</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Marché</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Mosquée</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Hammam</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Hôpital</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Autre</div>
+            </div>
+          </div>
+          <div class="field-group col-2">
+            <div class="field-label">Adresse</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Date début fréquentation</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Date fin fréquentation</div>
+            <div class="field-line"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Lieu 2 -->
+      <div class="repeat-block">
+        <div class="repeat-num">Lieu 2</div>
+        <div class="grid-2">
+          <div class="field-group">
+            <div class="field-label">Nom du lieu</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Type de lieu</div>
+            <div class="radio-grid" style="flex-wrap:wrap;gap:3px;">
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Domicile</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> École</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Travail</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Marché</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Mosquée</div>
+              <div class="radio-opt" style="font-size:9px;padding:2px 7px;"><div class="radio-circle"></div> Autre</div>
+            </div>
+          </div>
+          <div class="field-group col-2">
+            <div class="field-label">Adresse</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Date début fréquentation</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Date fin fréquentation</div>
+            <div class="field-line"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════ SECTION 5 — PRÉLÈVEMENTS & RÉSULTATS LABORATOIRE ══════════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div class="section-letter">5</div>
+      <div class="section-title">Prélèvements &amp; Résultats Laboratoire</div>
+    </div>
+    <div class="section-body">
+
+      <!-- Prélèvement 1 -->
+      <div class="repeat-block">
+        <div class="repeat-num">Prélèvement 1</div>
+        <div class="grid-2">
+          <div class="field-group">
+            <div class="field-label">Type de prélèvement</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Date du prélèvement</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Germe identifié</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Résultat</div>
+            <div class="radio-grid">
+              <div class="radio-opt"><div class="radio-circle"></div> Positif</div>
+              <div class="radio-opt"><div class="radio-circle"></div> Négatif</div>
+              <div class="radio-opt"><div class="radio-circle"></div> En attente</div>
+            </div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Laboratoire</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Antibiogramme</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group col-2">
+            <div class="field-label">Notes</div>
+            <div class="field-line"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Prélèvement 2 -->
+      <div class="repeat-block">
+        <div class="repeat-num">Prélèvement 2</div>
+        <div class="grid-2">
+          <div class="field-group">
+            <div class="field-label">Type de prélèvement</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Date du prélèvement</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Germe identifié</div>
+            <div class="field-line"></div>
+          </div>
+          <div class="field-group">
+            <div class="field-label">Résultat</div>
+            <div class="radio-grid">
+              <div class="radio-opt"><div class="radio-circle"></div> Positif</div>
+              <div class="radio-opt"><div class="radio-circle"></div> Négatif</div>
+              <div class="radio-opt"><div class="radio-circle"></div> En attente</div>
+            </div>
+          </div>
+          <div class="field-group col-2">
+            <div class="field-label">Laboratoire / Antibiogramme / Notes</div>
+            <div class="field-line-lg"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════ NOTE FICHE SPÉCIFIQUE ══════════════ -->
+  <div class="fiche-note">
+    <strong>Section 6 — Fiche Spécifique (conditionnelle) :</strong>
+    Pour certaines maladies (ex. choléra, méningite, tuberculose, hépatite virale, etc.), une fiche spécifique complémentaire est automatiquement ajoutée par le système après sélection de la maladie.
+  </div>
+
+  <!-- ══════════════ VALIDATION ══════════════ -->
+  <div class="submit-bar">
+    <div class="submit-btn">
+      <div style="font-size:9px;margin-bottom:4px;">BROUILLON</div>
+      Enregistrer en tant que brouillon
+    </div>
+    <div class="submit-btn primary">
+      <div style="font-size:9px;margin-bottom:4px;opacity:0.8;">DÉCLARATION OFFICIELLE</div>
+      Valider la Déclaration
+    </div>
+  </div>
+
+  <!-- Signature -->
+  <div style="margin-top:12px;border:1px solid #dde5f0;border-radius:7px;padding:10px 12px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+      <div>
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#4a6080;margin-bottom:6px;">
+          Cachet &amp; Signature du Médecin Déclarant
+        </div>
+        <div style="border:1px dashed #b0c4de;border-radius:5px;height:60px;background:#fafcff;"></div>
+      </div>
+      <div>
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#4a6080;margin-bottom:6px;">
+          Cachet du Service / Établissement
+        </div>
+        <div style="border:1px dashed #b0c4de;border-radius:5px;height:60px;background:#fafcff;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════ FOOTER ══════════════ -->
+  <div class="footer">
+    <span>EHU d'Oran — Service Épidémiologie et Prévention</span>
+    <span>Système de Surveillance des Maladies à Déclaration Obligatoire (MDO)</span>
+    <span>Document généré le <span id="gen-date"></span></span>
+  </div>
+
+</div><!-- /.page -->
+
+<script>
+  document.getElementById('gen-date').textContent = new Date().toLocaleDateString('fr-DZ', {
+    day: '2-digit', month: '2-digit', year: 'numeric'
+  });
+</script>
+</body>
+</html>
