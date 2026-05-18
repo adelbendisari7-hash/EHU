@@ -604,10 +604,11 @@ export async function exportAnalysesPdf(data: AnalyticsPdfData) {
 
 // ---------- Rapport avec graphiques (html2canvas capture) ----------
 
-// html2canvas doesn't understand oklch() (used by Tailwind v4).
-// Convert oklch(l c h [/ a]) to an approximate hsl/rgb so html2canvas can parse it.
-function fixOklch(css: string): string {
-  return css.replace(/oklch\(([^)]+)\)/g, (_m, params) => {
+// html2canvas doesn't support oklch() or oklab() (used by Tailwind v4).
+// Convert them to approximate hsl/rgb so html2canvas can parse them.
+function fixModernColors(css: string): string {
+  // oklch(l c h [/ alpha])
+  const withoutOklch = css.replace(/oklch\(([^)]+)\)/g, (_m, params) => {
     const parts = params.trim().split(/[\s/]+/).map(parseFloat)
     const l = isNaN(parts[0]) ? 0.5 : Math.min(1, Math.max(0, parts[0]))
     const c = isNaN(parts[1]) ? 0 : parts[1]
@@ -617,6 +618,20 @@ function fixOklch(css: string): string {
       return `rgb(${v},${v},${v})`
     }
     return `hsl(${Math.round(h)},${Math.round(Math.min(c * 300, 100))}%,${Math.round(l * 100)}%)`
+  })
+  // oklab(l a b [/ alpha]) — convert via approximate hue from atan2(b,a)
+  return withoutOklch.replace(/oklab\(([^)]+)\)/g, (_m, params) => {
+    const parts = params.trim().split(/[\s/]+/).map(parseFloat)
+    const l = isNaN(parts[0]) ? 0.5 : Math.min(1, Math.max(0, parts[0]))
+    const a = isNaN(parts[1]) ? 0 : parts[1]
+    const b = isNaN(parts[2]) ? 0 : parts[2]
+    const c = Math.sqrt(a * a + b * b)
+    if (c < 0.02) {
+      const v = Math.round(l * 255)
+      return `rgb(${v},${v},${v})`
+    }
+    const h = (Math.atan2(b, a) * 180) / Math.PI
+    return `hsl(${Math.round((h + 360) % 360)},${Math.round(Math.min(c * 300, 100))}%,${Math.round(l * 100)}%)`
   })
 }
 
@@ -634,7 +649,7 @@ export async function exportRapportPdfAvecGraphiques(elementId: string, filename
     try {
       const res = await fetch(link.href)
       const css = await res.text()
-      patchedStyles.set(link.href, fixOklch(css))
+      patchedStyles.set(link.href, fixModernColors(css))
     } catch { /* keep link as-is if fetch fails */ }
   }))
 
@@ -647,7 +662,7 @@ export async function exportRapportPdfAvecGraphiques(elementId: string, filename
     onclone: (clonedDoc) => {
       // Patch inline <style> blocks
       clonedDoc.querySelectorAll("style").forEach((s) => {
-        if (s.textContent) s.textContent = fixOklch(s.textContent)
+        if (s.textContent) s.textContent = fixModernColors(s.textContent)
       })
       // Replace <link> stylesheets with pre-patched <style> blocks
       clonedDoc.querySelectorAll<HTMLLinkElement>("link[rel='stylesheet']").forEach((link) => {
