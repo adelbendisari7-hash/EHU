@@ -1,25 +1,42 @@
-# dependencies
+# Dependencies
 node_modules/
-.pnp
-.pnp.js
 
-# next.js build output
+# Next.js build output
 .next/
 out/
 
-# env files — never commit secrets
+# Environment variables — NEVER commit these
 .env
 .env.local
+.env.production
 .env.*.local
-*.env.vercel
 
-# vercel
-.vercel/
+# Prisma
+prisma/migrations/dev_*
+prisma/*.db
+prisma/*.db-journal
 
-# typescript build info
-*.tsbuildinfo
-tsconfig.tsbuildinfo
+# Logs
+*.log
+npm-debug.log*
+/var/log/
 
-# misc
+# OS
 .DS_Store
 Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# TypeScript
+*.tsbuildinfo
+
+# PM2
+.pm2/
+
+.vercel
+
+.vercel
