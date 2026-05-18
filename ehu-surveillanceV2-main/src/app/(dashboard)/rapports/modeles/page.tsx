@@ -26,11 +26,21 @@ const SECTION_OPTIONS = [
   "Annexes",
 ]
 
+const VISUALISATION_OPTIONS = [
+  { value: "histogramme_maladies", label: "Histogramme par maladie" },
+  { value: "courbe_temporelle", label: "Courbe d'évolution hebdomadaire" },
+  { value: "pyramide_ages", label: "Pyramide des âges" },
+  { value: "camembert_statuts", label: "Camembert des statuts cliniques" },
+  { value: "distribution_services", label: "Distribution par service" },
+  { value: "tableau_recapitulatif", label: "Tableau récapitulatif MDO" },
+]
+
 interface Template {
   id: string
   titre: string
   type: string
   sections: string[]
+  visualisations: string[]
   description: string
   createdAt: string
   createdBy: string
@@ -42,7 +52,7 @@ export default function RapportModelesPage() {
   const [showModal, setShowModal] = useState(false)
   const [editTemplate, setEditTemplate] = useState<Template | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-  const [form, setForm] = useState({ titre: "", type: "mensuel", description: "", sections: [] as string[] })
+  const [form, setForm] = useState({ titre: "", type: "mensuel", description: "", sections: [] as string[], visualisations: [] as string[] })
   const [submitting, setSubmitting] = useState(false)
 
   const fetchTemplates = useCallback(async () => {
@@ -60,13 +70,13 @@ export default function RapportModelesPage() {
 
   const openCreate = () => {
     setEditTemplate(null)
-    setForm({ titre: "", type: "mensuel", description: "", sections: [] })
+    setForm({ titre: "", type: "mensuel", description: "", sections: [], visualisations: [] })
     setShowModal(true)
   }
 
   const openEdit = (t: Template) => {
     setEditTemplate(t)
-    setForm({ titre: t.titre, type: t.type, description: t.description, sections: [...t.sections] })
+    setForm({ titre: t.titre, type: t.type, description: t.description, sections: [...t.sections], visualisations: [...(t.visualisations ?? [])] })
     setShowModal(true)
   }
 
@@ -74,6 +84,13 @@ export default function RapportModelesPage() {
     setForm(prev => ({
       ...prev,
       sections: prev.sections.includes(s) ? prev.sections.filter(x => x !== s) : [...prev.sections, s],
+    }))
+  }
+
+  const toggleVisualisation = (v: string) => {
+    setForm(prev => ({
+      ...prev,
+      visualisations: prev.visualisations.includes(v) ? prev.visualisations.filter(x => x !== v) : [...prev.visualisations, v],
     }))
   }
 
@@ -168,6 +185,17 @@ export default function RapportModelesPage() {
                   )}
                 </div>
               )}
+              {t.visualisations?.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {t.visualisations.slice(0, 2).map(v => {
+                    const opt = VISUALISATION_OPTIONS.find(o => o.value === v)
+                    return <span key={v} className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-600 rounded-md">{opt?.label ?? v}</span>
+                  })}
+                  {t.visualisations.length > 2 && (
+                    <span className="text-[10px] px-2 py-0.5 bg-blue-50 text-blue-500 rounded-md">+{t.visualisations.length - 2} graphiques</span>
+                  )}
+                </div>
+              )}
 
               <p className="text-[11px] text-gray-400 mt-auto pt-1 border-t border-gray-50">
                 Créé le {formatDate(t.createdAt)} par {t.createdBy}
@@ -240,6 +268,28 @@ export default function RapportModelesPage() {
                         {form.sections.includes(s) && <Check size={10} className="text-white" />}
                       </div>
                       <span className="text-sm text-gray-700">{s}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-2">Visualisations à inclure</label>
+                <div className="space-y-1.5">
+                  {VISUALISATION_OPTIONS.map(opt => (
+                    <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer group">
+                      <div
+                        onClick={() => toggleVisualisation(opt.value)}
+                        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
+                          form.visualisations.includes(opt.value)
+                            ? "border-blue-600"
+                            : "border-gray-300 group-hover:border-gray-400"
+                        }`}
+                        style={form.visualisations.includes(opt.value) ? { backgroundColor: "#1B4F8A", borderColor: "#1B4F8A" } : {}}
+                      >
+                        {form.visualisations.includes(opt.value) && <Check size={10} className="text-white" />}
+                      </div>
+                      <span className="text-sm text-gray-700">{opt.label}</span>
                     </label>
                   ))}
                 </div>

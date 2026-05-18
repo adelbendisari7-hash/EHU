@@ -5,15 +5,24 @@ import { useParams } from "next/navigation"
 import Link from "next/link"
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell, LineChart, Line, PieChart, Pie, Legend,
+  ResponsiveContainer, Cell, LineChart, Line, PieChart, Pie,
 } from "recharts"
-import { exportAnalysesPdf, printAnalysesPdf } from "@/utils/export-pdf"
+import { exportRapportPdfAvecGraphiques } from "@/utils/export-pdf"
 import { exportAnalysesExcel } from "@/utils/export-excel"
 import {
   FileText, FileSpreadsheet, ArrowLeft, Printer,
   Activity, CheckCircle, AlertTriangle, Search,
   Calendar, Building2, TrendingUp, Users,
 } from "lucide-react"
+
+const VIS_ALL = [
+  "histogramme_maladies",
+  "courbe_temporelle",
+  "pyramide_ages",
+  "camembert_statuts",
+  "distribution_services",
+  "tableau_recapitulatif",
+]
 
 const PALETTE = ["#1B4F8A", "#2E7D32", "#E65100", "#6A1B9A", "#00838F", "#AD1457", "#4E342E", "#37474F"]
 
@@ -74,7 +83,7 @@ export default function RapportDetailPage() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [rapport, setRapport] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [exportLoading, setExportLoading] = useState<"pdf" | "excel" | "print" | null>(null)
+  const [exportLoading, setExportLoading] = useState<"pdf" | "excel" | null>(null)
 
   useEffect(() => {
     fetch(`/api/rapports/${id}`)
@@ -86,35 +95,13 @@ export default function RapportDetailPage() {
   const handlePdf = async () => {
     setExportLoading("pdf")
     try {
-      const period = `${new Date(rapport.dateDebut).toLocaleDateString("fr-FR")} — ${new Date(rapport.dateFin).toLocaleDateString("fr-FR")}`
-      const d = rapport.donnees
-      await exportAnalysesPdf({
-        summary: d.summary,
-        prevalence: d.casByMaladie?.map((r: { maladie: string; count: number }) => ({ name: r.maladie, count: r.count })) ?? [],
-        weeklyTrend: d.weeklyTrend ?? [],
-        ageDistribution: d.ageDistribution ?? [],
-        sexDistribution: d.sexDistribution ?? [],
-        statutDistribution: d.statutDistribution ?? [],
-        period,
-      })
+      const dateStr = new Date().toISOString().slice(0, 10)
+      await exportRapportPdfAvecGraphiques("rapport-print-area", `rapport-epidemiologique-${dateStr}.pdf`)
     } finally { setExportLoading(null) }
   }
 
-  const handlePrint = async () => {
-    setExportLoading("print")
-    try {
-      const period = `${new Date(rapport.dateDebut).toLocaleDateString("fr-FR")} — ${new Date(rapport.dateFin).toLocaleDateString("fr-FR")}`
-      const d = rapport.donnees
-      await printAnalysesPdf({
-        summary: d.summary,
-        prevalence: d.casByMaladie?.map((r: { maladie: string; count: number }) => ({ name: r.maladie, count: r.count })) ?? [],
-        weeklyTrend: d.weeklyTrend ?? [],
-        ageDistribution: d.ageDistribution ?? [],
-        sexDistribution: d.sexDistribution ?? [],
-        statutDistribution: d.statutDistribution ?? [],
-        period,
-      })
-    } finally { setExportLoading(null) }
+  const handlePrint = () => {
+    window.print()
   }
 
   const handleExcel = async () => {
@@ -154,6 +141,10 @@ export default function RapportDetailPage() {
   }
 
   const d = rapport.donnees
+  // Visualisations enabled in this report (falls back to all if not set)
+  const vis: string[] = d.visualisations?.length > 0 ? d.visualisations : VIS_ALL
+  const hasVis = (key: string) => vis.includes(key)
+
   const dateDebut = new Date(rapport.dateDebut).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
   const dateFin = new Date(rapport.dateFin).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
   const dateGeneration = new Date(rapport.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
@@ -163,7 +154,7 @@ export default function RapportDetailPage() {
     : 0
 
   return (
-    <div className="max-w-5xl">
+    <div className="max-w-5xl" id="rapport-print-area">
 
       {/* ── En-tête officielle ─────────────────────────────────────── */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm mb-6 overflow-hidden">
@@ -185,11 +176,10 @@ export default function RapportDetailPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
-              disabled={exportLoading !== null}
-              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white border border-white/30 hover:bg-white/10 transition-colors disabled:opacity-60"
+              className="no-print flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-white border border-white/30 hover:bg-white/10 transition-colors"
             >
               <Printer size={14} />
-              {exportLoading === "print" ? "Préparation..." : "Imprimer"}
+              Imprimer
             </button>
           </div>
         </div>
@@ -226,7 +216,7 @@ export default function RapportDetailPage() {
       </div>
 
       {/* ── Actions export ─────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-5">
+      <div className="no-print flex items-center justify-between mb-5">
         <Link href="/rapports" className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors">
           <ArrowLeft size={15} />
           Retour aux rapports
@@ -284,9 +274,9 @@ export default function RapportDetailPage() {
       </div>
 
       {/* ── Distribution par maladie + Tendance hebdomadaire ──────── */}
-      {(d.casByMaladie?.length > 0 || d.weeklyTrend?.length > 0) && (
+      {(d.casByMaladie?.length > 0 || d.weeklyTrend?.length > 0) && (hasVis("histogramme_maladies") || hasVis("courbe_temporelle")) && (
         <div className="grid grid-cols-5 gap-4 mb-4">
-          {d.casByMaladie?.length > 0 && (
+          {d.casByMaladie?.length > 0 && hasVis("histogramme_maladies") && (
             <div className="col-span-3 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <SectionTitle>Distribution par Maladie (CIM-10)</SectionTitle>
               <ResponsiveContainer width="100%" height={240}>
@@ -315,7 +305,7 @@ export default function RapportDetailPage() {
             </div>
           )}
 
-          {d.weeklyTrend?.length > 0 && (
+          {d.weeklyTrend?.length > 0 && hasVis("courbe_temporelle") && (
             <div className="col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <SectionTitle>Évolution Hebdomadaire</SectionTitle>
               <ResponsiveContainer width="100%" height={240}>
@@ -343,7 +333,7 @@ export default function RapportDetailPage() {
       )}
 
       {/* ── Cas par service ────────────────────────────────────────── */}
-      {d.casByService?.length > 0 && (
+      {d.casByService?.length > 0 && hasVis("distribution_services") && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4">
           <SectionTitle>Répartition par Service Hospitalier</SectionTitle>
           <div className="overflow-x-auto">
@@ -383,8 +373,9 @@ export default function RapportDetailPage() {
       )}
 
       {/* ── Pyramide des âges + Statuts ────────────────────────────── */}
+      {(hasVis("pyramide_ages") || hasVis("camembert_statuts")) && (
       <div className="grid grid-cols-2 gap-4 mb-4">
-        {d.ageDistribution?.length > 0 && (
+        {d.ageDistribution?.length > 0 && hasVis("pyramide_ages") && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <SectionTitle>Pyramide des Âges</SectionTitle>
             <ResponsiveContainer width="100%" height={200}>
@@ -402,7 +393,7 @@ export default function RapportDetailPage() {
           </div>
         )}
 
-        {d.statutDistribution?.length > 0 && (
+        {d.statutDistribution?.length > 0 && hasVis("camembert_statuts") && (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
             <SectionTitle>Répartition par Statut Clinique</SectionTitle>
             <div className="grid grid-cols-2 gap-4 mt-1">
@@ -449,9 +440,10 @@ export default function RapportDetailPage() {
           </div>
         )}
       </div>
+      )}
 
       {/* ── Tableau récapitulatif maladies ─────────────────────────── */}
-      {d.casByMaladie?.length > 0 && (
+      {d.casByMaladie?.length > 0 && hasVis("tableau_recapitulatif") && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4">
           <SectionTitle>Tableau Récapitulatif — Maladies à Déclaration Obligatoire</SectionTitle>
           <table className="w-full text-sm">

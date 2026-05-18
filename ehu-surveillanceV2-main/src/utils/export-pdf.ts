@@ -602,6 +602,43 @@ export async function exportAnalysesPdf(data: AnalyticsPdfData) {
   doc.save(`rapport-epidemiologique-ehu-${dateStr}.pdf`)
 }
 
+// ---------- Rapport avec graphiques (html2canvas capture) ----------
+export async function exportRapportPdfAvecGraphiques(elementId: string, filename: string) {
+  const element = document.getElementById(elementId)
+  if (!element) throw new Error(`Element #${elementId} not found`)
+
+  const { default: html2canvas } = await import("html2canvas")
+  const { default: jsPDF } = await import("jspdf")
+
+  const canvas = await html2canvas(element, {
+    scale: 2,
+    useCORS: true,
+    backgroundColor: "#ffffff",
+    logging: false,
+    windowWidth: element.scrollWidth,
+    windowHeight: element.scrollHeight,
+  })
+
+  const imgData = canvas.toDataURL("image/png")
+  const pageW = 210
+  const pageH = 297
+  const imgW = pageW
+  const imgH = (canvas.height * imgW) / canvas.width
+
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" })
+
+  let yOffset = 0
+  let pageCount = 0
+  while (yOffset < imgH) {
+    if (pageCount > 0) doc.addPage()
+    doc.addImage(imgData, "PNG", 0, -yOffset, imgW, imgH)
+    yOffset += pageH
+    pageCount++
+  }
+
+  doc.save(filename)
+}
+
 export async function printAnalysesPdf(data: AnalyticsPdfData) {
   const { default: jsPDF } = await import("jspdf")
   const { default: autoTable } = await import("jspdf-autotable")

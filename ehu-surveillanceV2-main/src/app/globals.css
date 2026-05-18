@@ -444,3 +444,29 @@ button:active:not(:disabled) {
   .mobile-table-hide { display: none !important; }
   .mobile-card-show  { display: block !important; }
 }
+
+@media print {
+  /* Hide all navigation, sidebar, topbar, and action buttons when printing */
+  .no-print,
+  nav,
+  aside,
+  header {
+    display: none !important;
+  }
+  /* Ensure the print area fills the page */
+  body {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  #rapport-print-area {
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  /* Avoid page breaks inside cards */
+  .bg-white {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

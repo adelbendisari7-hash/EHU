@@ -10,7 +10,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
   const { id } = await params
   const body = await req.json()
-  const { titre, type, sections, description } = body
+  const { titre, type, sections, visualisations, description } = body
 
   const existing = await prisma.rapport.findUnique({ where: { id } })
   if (!existing) return NextResponse.json({ error: "Modèle introuvable" }, { status: 404 })
@@ -23,6 +23,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       donnees: {
         isTemplate: true,
         sections: sections ?? (existing.donnees as Record<string, unknown>)?.sections ?? [],
+        visualisations: visualisations ?? (existing.donnees as Record<string, unknown>)?.visualisations ?? [],
         description: description ?? (existing.donnees as Record<string, unknown>)?.description ?? "",
       },
     },

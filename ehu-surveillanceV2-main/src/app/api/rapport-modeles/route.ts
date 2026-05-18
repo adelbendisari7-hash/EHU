@@ -35,6 +35,8 @@ export async function GET(req: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       sections: (r.donnees as any)?.sections ?? [],
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      visualisations: (r.donnees as any)?.visualisations ?? [],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       description: (r.donnees as any)?.description ?? "",
       createdAt: r.createdAt,
       createdBy: r.createdByUser ? `${r.createdByUser.firstName} ${r.createdByUser.lastName}` : "—",
@@ -50,7 +52,7 @@ export async function POST(req: Request) {
   }
 
   const body = await req.json()
-  const { titre, type, sections, description } = body
+  const { titre, type, sections, visualisations, description } = body
 
   if (!titre || !type) {
     return NextResponse.json({ error: "Titre et type requis" }, { status: 400 })
@@ -62,7 +64,7 @@ export async function POST(req: Request) {
       type,
       dateDebut: TEMPLATE_DATE,
       dateFin: TEMPLATE_DATE,
-      donnees: { isTemplate: true, sections: sections ?? [], description: description ?? "" },
+      donnees: { isTemplate: true, sections: sections ?? [], visualisations: visualisations ?? [], description: description ?? "" },
       generePar: "utilisateur",
       createdBy: session.user.id,
     },
