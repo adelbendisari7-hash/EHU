@@ -603,6 +603,23 @@ export async function exportAnalysesPdf(data: AnalyticsPdfData) {
 }
 
 // ---------- Rapport avec graphiques (html2canvas capture) ----------
+
+// html2canvas doesn't understand oklch() (used by Tailwind v4).
+// Convert oklch(l c h [/ a]) to an approximate hsl/rgb so html2canvas can parse it.
+function fixOklch(css: string): string {
+  return css.replace(/oklch\(([^)]+)\)/g, (_m, params) => {
+    const parts = params.trim().split(/[\s/]+/).map(parseFloat)
+    const l = isNaN(parts[0]) ? 0.5 : Math.min(1, Math.max(0, parts[0]))
+    const c = isNaN(parts[1]) ? 0 : parts[1]
+    const h = isNaN(parts[2]) ? 0 : parts[2]
+    if (c < 0.02) {
+      const v = Math.round(l * 255)
+      return `rgb(${v},${v},${v})`
+    }
+    return `hsl(${Math.round(h)},${Math.round(Math.min(c * 300, 100))}%,${Math.round(l * 100)}%)`
+  })
+}
+
 export async function exportRapportPdfAvecGraphiques(elementId: string, filename: string) {
   const element = document.getElementById(elementId)
   if (!element) throw new Error(`Element #${elementId} not found`)
@@ -610,13 +627,39 @@ export async function exportRapportPdfAvecGraphiques(elementId: string, filename
   const { default: html2canvas } = await import("html2canvas")
   const { default: jsPDF } = await import("jspdf")
 
+  // Pre-fetch linked stylesheets and patch oklch before html2canvas sees them
+  const linkEls = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))
+  const patchedStyles = new Map<string, string>()
+  await Promise.all(linkEls.map(async (link) => {
+    try {
+      const res = await fetch(link.href)
+      const css = await res.text()
+      patchedStyles.set(link.href, fixOklch(css))
+    } catch { /* keep link as-is if fetch fails */ }
+  }))
+
   const canvas = await html2canvas(element, {
     scale: 2,
     useCORS: true,
+    allowTaint: true,
     backgroundColor: "#ffffff",
     logging: false,
-    windowWidth: element.scrollWidth,
-    windowHeight: element.scrollHeight,
+    onclone: (clonedDoc) => {
+      // Patch inline <style> blocks
+      clonedDoc.querySelectorAll("style").forEach((s) => {
+        if (s.textContent) s.textContent = fixOklch(s.textContent)
+      })
+      // Replace <link> stylesheets with pre-patched <style> blocks
+      clonedDoc.querySelectorAll<HTMLLinkElement>("link[rel='stylesheet']").forEach((link) => {
+        const css = patchedStyles.get(link.href)
+        if (css) {
+          const style = clonedDoc.createElement("style")
+          style.textContent = css
+          link.parentNode?.insertBefore(style, link)
+          link.remove()
+        }
+      })
+    },
   })
 
   const imgData = canvas.toDataURL("image/png")
