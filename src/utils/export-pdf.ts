@@ -642,40 +642,42 @@ export async function exportRapportPdfAvecGraphiques(elementId: string, filename
   const { default: html2canvas } = await import("html2canvas")
   const { default: jsPDF } = await import("jspdf")
 
-  // Pre-fetch linked stylesheets and patch oklch before html2canvas sees them
-  const linkEls = Array.from(document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]'))
-  const patchedStyles = new Map<string, string>()
-  await Promise.all(linkEls.map(async (link) => {
-    try {
-      const res = await fetch(link.href)
-      const css = await res.text()
-      patchedStyles.set(link.href, fixModernColors(css))
-    } catch { /* keep link as-is if fetch fails */ }
-  }))
-
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    allowTaint: true,
-    backgroundColor: "#ffffff",
-    logging: false,
-    onclone: (clonedDoc) => {
-      // Patch inline <style> blocks
-      clonedDoc.querySelectorAll("style").forEach((s) => {
-        if (s.textContent) s.textContent = fixModernColors(s.textContent)
-      })
-      // Replace <link> stylesheets with pre-patched <style> blocks
-      clonedDoc.querySelectorAll<HTMLLinkElement>("link[rel='stylesheet']").forEach((link) => {
-        const css = patchedStyles.get(link.href)
-        if (css) {
-          const style = clonedDoc.createElement("style")
-          style.textContent = css
-          link.parentNode?.insertBefore(style, link)
-          link.remove()
+  // html2canvas reads colors via window.getComputedStyle(), which returns oklch/oklab
+  // values resolved by the browser (Tailwind v4). Patching stylesheets in onclone is
+  // not enough — we must intercept getComputedStyle itself.
+  const origGCS = window.getComputedStyle
+  window.getComputedStyle = function (
+    ...args: Parameters<typeof window.getComputedStyle>
+  ): CSSStyleDeclaration {
+    const style = origGCS.apply(window, args)
+    return new Proxy(style, {
+      get(target, prop) {
+        if (prop === "getPropertyValue") {
+          return (name: string) => {
+            const val = target.getPropertyValue(name)
+            return typeof val === "string" ? fixModernColors(val) : val
+          }
         }
-      })
-    },
-  })
+        const val = Reflect.get(target, prop)
+        if (typeof val === "string") return fixModernColors(val)
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        if (typeof val === "function") return (val as (...a: unknown[]) => unknown).bind(target)
+        return val
+      },
+    }) as CSSStyleDeclaration
+  }
+
+  let canvas: HTMLCanvasElement
+  try {
+    canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+    })
+  } finally {
+    window.getComputedStyle = origGCS
+  }
 
   const imgData = canvas.toDataURL("image/png")
   const pageW = 210
