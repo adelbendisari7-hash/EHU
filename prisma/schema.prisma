@@ -461,22 +461,23 @@ model Alerte {
 // ─── Maladie — Phase A CIM-10 ────────────────────────────────────────────────
 
 model Maladie {
-  id                   String   @id @default(uuid())
-  nom                  String
-  codeCim10            String   @unique @map("code_cim10")
-  categorie            String   // "categorie_1_mdo" | "categorie_2_epidemique" | "categorie_3_bmr"
-  nomCourt             String?  @map("nom_court")
-  seuilDefaut          Int?     @map("seuil_defaut")
-  periodeDefautJours   Int?     @default(30) @map("periode_defaut_jours")
-  categorieGravite     String?  @map("categorie_gravite") // "faible"|"moderee"|"grave"|"tres_grave"
-  delaiNotificationHeures Int?   @map("delai_notification_heures")
-  hasFicheSpecifique   Boolean  @default(false) @map("has_fiche_specifique")
-  ficheSpecifiqueSlug  String?  @map("fiche_specifique_slug")
-  groupeEpidemiologique String? @map("groupe_epidemiologique")
-  seuilAlertTexte      String?  @map("seuil_alerte_texte")
-  delaiDeclarationTexte String? @map("delai_declaration_texte")
-  isActive             Boolean  @default(true) @map("is_active")
-  createdAt            DateTime @default(now()) @map("created_at")
+  id                      String   @id @default(uuid())
+  nom                     String
+  codeCim10               String   @unique @map("code_cim10")
+  categorie               String   // "categorie_1_mdo" | "categorie_2_epidemique" | "categorie_3_bmr"
+  frequenceDeclaration    String?  @map("frequence_declaration") // "urgence" | "quotidienne" | "hebdomadaire" | "mensuelle"
+  nomCourt                String?  @map("nom_court")
+  seuilDefaut             Int?     @map("seuil_defaut")
+  periodeDefautJours      Int?     @default(30) @map("periode_defaut_jours")
+  categorieGravite        String?  @map("categorie_gravite") // "faible"|"moderee"|"grave"|"tres_grave"
+  delaiNotificationHeures Int?     @map("delai_notification_heures")
+  hasFicheSpecifique      Boolean  @default(false) @map("has_fiche_specifique")
+  ficheSpecifiqueSlug     String?  @map("fiche_specifique_slug")
+  groupeEpidemiologique   String?  @map("groupe_epidemiologique")
+  seuilAlertTexte         String?  @map("seuil_alerte_texte")
+  delaiDeclarationTexte   String?  @map("delai_declaration_texte")
+  isActive                Boolean  @default(true) @map("is_active")
+  createdAt               DateTime @default(now()) @map("created_at")
 
   casDeclares  CasDeclare[]
   alertes      Alerte[]
