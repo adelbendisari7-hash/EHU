@@ -7,7 +7,7 @@ import Image from "next/image"
 import {
   LayoutDashboard, FilePlus, List, Search,
   BarChart, AlertTriangle, Users, Settings, Shield, LogOut, Menu, X, FileBarChart,
-  ChevronRight, TrendingUp, History, Bell, Activity, LayoutTemplate,
+  ChevronRight, TrendingUp, History, Bell, Activity, LayoutTemplate, ShieldCheck, Biohazard,
 } from "lucide-react"
 import { cn } from "@/utils/cn"
 import { NAV_ITEMS } from "@/constants/navigation"
@@ -16,6 +16,7 @@ import { signOut } from "next-auth/react"
 const ICONS: Record<string, React.ElementType> = {
   LayoutDashboard, FilePlus, List, Search,
   BarChart, AlertTriangle, Users, Settings, Shield, FileBarChart, TrendingUp, History, Bell, Activity, LayoutTemplate,
+  ShieldCheck, Biohazard,
 }
 
 const NAV_GROUPS: Record<string, string[]> = {
@@ -26,6 +27,7 @@ const NAV_GROUPS: Record<string, string[]> = {
   Administration: ["/utilisateurs", "/roles", "/parametres", "/parametres/historique"],
   Compte: ["/notifications"],
   "Interface UISTI": ["/uisti/morbidite", "/uisti/mortalite"],
+  "Interface UHH": ["/uhh/dashboard", "/uhh/ias"],
 }
 
 function NavLinks({
@@ -124,6 +126,7 @@ function SidebarFooter({ userName, userRole }: { userName: string; userRole: str
     epidemiologiste: "Épidémiologiste",
     admin: "Administrateur",
     uisti: "Unité UISTI",
+    uhh: "Hygiéniste UHH",
   }
 
   return (

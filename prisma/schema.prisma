@@ -65,6 +65,12 @@ enum ContactStatut {
   libere
 }
 
+enum TypeIAS {
+  PAVM
+  ISO
+  Autre
+}
+
 enum InvestigationStatut {
   en_cours
   terminee
@@ -161,6 +167,7 @@ model User {
   protocolesModifies Protocole[]    @relation("ProtocoleUpdatedBy")
   seuilsConfigures  SeuilAlerte[]
   rapportsCrees     Rapport[]
+  infectionsIAS     InfectionIAS[] @relation("UhhDeclarations")
 
   @@map("users")
 }
@@ -173,7 +180,8 @@ model Service {
   codeService String  @unique @map("code_service")
   isActive    Boolean @default(true) @map("is_active")
 
-  cas CasDeclare[] @relation("ServiceCas")
+  cas          CasDeclare[]   @relation("ServiceCas")
+  infectionsIAS InfectionIAS[]
 
   @@map("services")
 }
@@ -359,7 +367,8 @@ model Germe {
   type     String?                   // "bacterie" | "virus" | "parasite" | "champignon"
   isActive Boolean @default(true) @map("is_active")
 
-  resultatsLabo ResultatLabo[]
+  resultatsLabo  ResultatLabo[]
+  infectionsIAS  InfectionIAS[]
 
   @@map("germes")
 }
@@ -668,6 +677,32 @@ model ProtocoleDeclenchement {
   commune        Commune?    @relation(fields: [communeId], references: [id])
 
   @@map("protocole_declenchements")
+}
+
+// ─── InfectionIAS (UHH) ───────────────────────────────────────────────────────
+
+model InfectionIAS {
+  id                  String    @id @default(uuid())
+  typeIAS             TypeIAS   @map("type_ias")
+  serviceId           String    @map("service_id")
+  germeId             String?   @map("germe_id")
+  isBMR               Boolean   @default(false) @map("is_bmr")
+  dateDetection       DateTime  @map("date_detection")
+  dateHospitalisation DateTime? @map("date_hospitalisation")
+  agePatient          Int?      @map("age_patient")
+  sexePatient         Sexe?     @map("sexe_patient")
+  antibiogramme       String?
+  notes               String?
+  statut              String    @default("en_cours")
+  declarePar          String?   @map("declare_par")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  service   Service @relation(fields: [serviceId], references: [id])
+  germe     Germe?  @relation(fields: [germeId], references: [id])
+  declarant User?   @relation("UhhDeclarations", fields: [declarePar], references: [id])
+
+  @@map("infections_ias")
 }
 
 // ─── Rapport ──────────────────────────────────────────────────────────────────

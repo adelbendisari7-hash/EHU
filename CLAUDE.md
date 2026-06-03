@@ -51,18 +51,18 @@ Request → middleware.ts (JWT auth check) → app/api/*/route.ts → src/servic
 ### Routing Structure
 
 - `src/app/(auth)/` — Public routes: login, forgot-password, reset-password
-- `src/app/(dashboard)/` — Protected routes behind sidebar layout; one folder per feature
+- `src/app/(dashboard)/` — Protected routes behind sidebar layout; one folder per feature. Sub-sections: `declarations/`, `investigations/`, `alertes/`, `analyses/`, `predictions/`, `rapports/`, `uisti/` (UISTI morbidity/mortality stats), `parametres/`, `utilisateurs/`, `roles/`
 - `src/app/api/` — REST API handlers; collection at `[resource]/route.ts`, single item at `[resource]/[id]/route.ts`
 - `middleware.ts` — Intercepts all requests; allows only `/login`, `/forgot-password`, `/reset-password` unauthenticated; uses `authjs.session-token` cookie (or `__Secure-` prefix on HTTPS)
 
 ### API Route Convention
 
 Every route handler must follow this pattern:
-1. `auth()` → 401 if unauthenticated
+1. `auth()` → 401 if unauthenticated (or use `requirePermission`/`requireRole` from `src/lib/permissions.ts` which combine steps 1+2)
 2. Check permissions → 403 if unauthorized
 3. Validate body/params with Zod schema → 400 if invalid
 4. Call service function (business logic never belongs in route handlers)
-5. Write to `audit_logs` for any mutation
+5. Write to `audit_logs` for any mutation (via `src/lib/audit.ts`)
 6. Return JSON with appropriate HTTP status
 
 ### Authentication & Roles
@@ -79,7 +79,10 @@ Every route handler must follow this pattern:
 |------|---------|
 | `src/lib/auth.ts` | NextAuth configuration |
 | `src/lib/prisma.ts` | Prisma Client singleton (prevents hot-reload duplication) |
-| `src/lib/validators.ts` | All Zod schemas — single source of truth for validation |
+| `src/lib/permissions.ts` | `requirePermission(slug)` / `requireRole(...roles)` helpers used at the top of API route handlers; return a `NextResponse` (401/403) or `null` if authorized |
+| `src/lib/check-thresholds.ts` | Called after each case save; compares case counts against `SeuilAlerte` rules and auto-creates `Alerte` records + `Notification` rows |
+| `src/lib/predictions.ts` | Pure algorithmic functions: `computeCusum()` (CUSUM anomaly detection) and `computeHoltWinters()` (Holt linear trend + 14-day forecast) — no DB access, tested in isolation |
+| `src/lib/storage.ts` | Local-filesystem file storage to `public/uploads/`; exports `saveUploadedFile(file)` and `deleteUploadedFile(url)`. S3 env vars are optional future replacement |
 | `src/services/` | Business logic layer called by API routes |
 | `src/components/ui/` | shadcn/ui primitives (Radix UI) — do not edit manually |
 | `src/components/shared/` | Reusable cross-feature components |

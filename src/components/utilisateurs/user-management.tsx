@@ -25,12 +25,16 @@ interface Wilaya { id: string; nom: string; code: string }
 const ROLE_LABELS: Record<string, string> = {
   medecin: "Médecin Déclarant",
   epidemiologiste: "Épidémiologiste",
+  uisti: "Unité UISTI",
+  uhh: "Hygiéniste UHH",
   admin: "Administrateur",
 }
 
 const ROLE_COLORS: Record<string, { color: string; bg: string }> = {
   medecin: { color: "#1B4F8A", bg: "#EEF4FF" },
   epidemiologiste: { color: "#7C3AED", bg: "#F5F3FF" },
+  uisti: { color: "#B45309", bg: "#FEF3C7" },
+  uhh: { color: "#0F766E", bg: "#CCFBF1" },
   admin: { color: "#B91C1C", bg: "#FEF2F2" },
 }
 
@@ -46,7 +50,7 @@ export default function UserManagement({ initialUsers, etablissements, wilayas }
   const [showPassword, setShowPassword] = useState(false)
   const [search, setSearch] = useState("")
   const [roleFilter, setRoleFilter] = useState("")
-  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", role: "medecin", etablissementId: "", wilayadId: "" })
+  const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "", roleSlug: "medecin", etablissementId: "", wilayadId: "" })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
 
@@ -81,8 +85,10 @@ export default function UserManagement({ initialUsers, etablissements, wilayas }
       toast.error(msg)
     } else {
       const newUser = await res.json() as User
-      setUsers(prev => [newUser, ...prev])
-      setForm({ firstName: "", lastName: "", email: "", password: "", role: "medecin", etablissementId: "", wilayadId: "" })
+      // Injecter le rôle depuis le formulaire car l'API POST ne le retourne pas encore
+      const newUserWithRole = { ...newUser, role: form.roleSlug }
+      setUsers(prev => [newUserWithRole, ...prev])
+      setForm({ firstName: "", lastName: "", email: "", password: "", roleSlug: "medecin", etablissementId: "", wilayadId: "" })
       setShowForm(false)
       toast.success(`Utilisateur ${newUser.firstName} ${newUser.lastName} créé`)
     }
@@ -183,9 +189,11 @@ export default function UserManagement({ initialUsers, etablissements, wilayas }
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Rôle *</label>
-              <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className={input}>
+              <select value={form.roleSlug} onChange={e => setForm(f => ({ ...f, roleSlug: e.target.value }))} className={input}>
                 <option value="medecin">Médecin Déclarant</option>
                 <option value="epidemiologiste">Épidémiologiste</option>
+                <option value="uisti">Unité UISTI</option>
+                <option value="uhh">Hygiéniste UHH</option>
                 <option value="admin">Administrateur</option>
               </select>
             </div>
@@ -212,9 +220,11 @@ export default function UserManagement({ initialUsers, etablissements, wilayas }
         <input type="text" placeholder="Rechercher..." value={search} onChange={e => setSearch(e.target.value)} className="h-9 px-3 rounded-lg border border-gray-200 text-sm outline-none focus:border-[#1B4F8A] flex-1 max-w-xs" />
         <select value={roleFilter} onChange={e => setRoleFilter(e.target.value)} className="h-9 px-3 rounded-lg border border-gray-200 text-sm outline-none focus:border-[#1B4F8A]">
           <option value="">Tous les rôles</option>
-          <option value="medecin">Médecin</option>
+          <option value="medecin">Médecin Déclarant</option>
           <option value="epidemiologiste">Épidémiologiste</option>
-          <option value="admin">Admin</option>
+          <option value="uisti">Unité UISTI</option>
+          <option value="uhh">Hygiéniste UHH</option>
+          <option value="admin">Administrateur</option>
         </select>
       </div>
 

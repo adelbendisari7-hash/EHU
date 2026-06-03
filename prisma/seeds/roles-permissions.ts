@@ -46,6 +46,11 @@ export const PERMISSIONS_SEED = [
   // UISTI
   { slug: "uisti.morbidite", name: "Accéder à la morbidité hospitalière MDO", module: "uisti" },
   { slug: "uisti.mortalite", name: "Accéder au croisement mortalité-MDO", module: "uisti" },
+  // UHH — Unité d'Hygiène Hospitalière
+  { slug: "uhh.ias.view", name: "Voir les infections IAS", module: "uhh" },
+  { slug: "uhh.ias.create", name: "Déclarer une infection IAS", module: "uhh" },
+  { slug: "uhh.ias.edit", name: "Modifier une infection IAS", module: "uhh" },
+  { slug: "uhh.dashboard", name: "Voir le tableau de bord UHH", module: "uhh" },
 ]
 
 export const ROLES_SEED = [
@@ -91,6 +96,19 @@ export const ROLES_SEED = [
     permissions: [
       "uisti.morbidite",
       "uisti.mortalite",
+    ],
+  },
+  {
+    name: "Hygiéniste UHH",
+    slug: "uhh",
+    description: "Unité d'Hygiène Hospitalière — surveillance des infections associées aux soins (IAS)",
+    color: "#0F766E",
+    isSystem: true,
+    permissions: [
+      "uhh.dashboard",
+      "uhh.ias.view",
+      "uhh.ias.create",
+      "uhh.ias.edit",
     ],
   },
   {

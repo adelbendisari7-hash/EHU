@@ -101,6 +101,14 @@ export default function EpidemicMap({ markers, wilayaStats, selectedWilayadIds, 
   const mapInstanceRef = useRef<unknown>(null)
   const layersRef = useRef<unknown[]>([])
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const safeRemoveMap = (m: any) => {
+    if (!m) return
+    try { m.stop() } catch { /* ignore */ }
+    try { m.off() } catch { /* ignore */ }
+    try { m.remove() } catch { /* ignore */ }
+  }
+
   useEffect(() => {
     if (!mapRef.current) return
     let destroyed = false
@@ -110,8 +118,7 @@ export default function EpidemicMap({ markers, wilayaStats, selectedWilayadIds, 
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       if ((mapRef.current as any)._leaflet_id) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(mapInstanceRef.current as any)?.remove()
+        safeRemoveMap(mapInstanceRef.current)
         mapInstanceRef.current = null
       }
 
@@ -123,7 +130,14 @@ export default function EpidemicMap({ markers, wilayaStats, selectedWilayadIds, 
         shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
       })
 
-      const map = L.map(mapRef.current, { zoomControl: true }).setView([35.69, -0.63], 9)
+      const initialCenter: [number, number] = selectedWilayadIds.length === 1 && allWilayas
+        ? (() => {
+            const w = allWilayas.find(w => w.id === selectedWilayadIds[0])
+            return (w && WILAYA_CENTROIDS[w.code]) ? WILAYA_CENTROIDS[w.code] : [28.0, 2.7]
+          })()
+        : [28.0, 2.7]
+      const initialZoom = selectedWilayadIds.length === 1 ? 9 : 5
+      const map = L.map(mapRef.current, { zoomControl: true }).setView(initialCenter, initialZoom)
       mapInstanceRef.current = map
       layersRef.current = []
 
@@ -199,26 +213,15 @@ export default function EpidemicMap({ markers, wilayaStats, selectedWilayadIds, 
         layersRef.current.push(dot)
       })
 
-      // ── Auto-zoom to first selected wilaya ───────────────────────────────
-      if (selectedWilayadIds.length > 0) {
-        const refList = allWilayas ?? Object.values(wilayaById)
-        const found = refList.find(w => w.id === selectedWilayadIds[0])
-        if (found) {
-          const code = found.code
-          const centroid = WILAYA_CENTROIDS[code] ?? WILAYA_CENTROIDS[code.padStart(2, "0")]
-          if (centroid) map.setView(centroid, 9)
-        }
-      }
+      // Auto-zoom already handled in initialCenter/initialZoom above
     })
 
     return () => {
       destroyed = true
-      if (mapInstanceRef.current) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ;(mapInstanceRef.current as any).remove()
-        mapInstanceRef.current = null
-      }
+      safeRemoveMap(mapInstanceRef.current)
+      mapInstanceRef.current = null
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [markers, wilayaStats, selectedWilayadIds, allWilayas])
 
   return (

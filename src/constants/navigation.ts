@@ -24,4 +24,7 @@ export const NAV_ITEMS: NavItem[] = [
   // UISTI
   { label: "Morbidité Hospitalière", href: "/uisti/morbidite", icon: "Activity", permission: "uisti.morbidite" },
   { label: "Croisement Mortalité", href: "/uisti/mortalite", icon: "AlertTriangle", permission: "uisti.mortalite" },
+  // UHH — Unité d'Hygiène Hospitalière
+  { label: "Tableau de bord UHH", href: "/uhh/dashboard", icon: "ShieldCheck", permission: "uhh.dashboard" },
+  { label: "Infections IAS", href: "/uhh/ias", icon: "Biohazard", permission: "uhh.ias.view" },
 ]
