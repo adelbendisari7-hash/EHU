@@ -6,7 +6,7 @@ import { cn } from "@/utils/cn"
 
 
 
-interface Maladie { id: string; nom: string }
+interface Maladie { id: string; nom: string; groupeEpidemiologique?: string | null }
 interface Commune { id: string; nom: string; wilayadId?: string }
 interface Wilaya { id: string; nom: string; code: string }
 
@@ -29,6 +29,16 @@ interface Props {
   onChange: (filters: DashboardFiltersState) => void
 }
 
+const GROUPE_LABELS: Record<string, string> = {
+  pev: "PEV", mth: "MTH", zoonose: "Zoonose", ist: "IST",
+  vectorielle: "Vectorielle", nosocomiale: "Nosocomiale", autre: "Autre",
+}
+const GROUPE_COLORS: Record<string, string> = {
+  pev: "#7C3AED", mth: "#2563EB", zoonose: "#D97706",
+  ist: "#DC2626", vectorielle: "#EA580C", nosocomiale: "#059669", autre: "#6B7280",
+}
+const GROUPES_ORDER = ["pev", "mth", "zoonose", "ist", "vectorielle", "nosocomiale", "autre"]
+
 // Generic multi-select searchable component
 function MultiSelect({
   options,
@@ -37,7 +47,7 @@ function MultiSelect({
   placeholder,
   width = "min-w-[160px]",
 }: {
-  options: { value: string; label: string }[]
+  options: { value: string; label: string; group?: string }[]
   selected: string[]
   onChange: (vals: string[]) => void
   placeholder: string
@@ -55,6 +65,8 @@ function MultiSelect({
       onChange([...selected, val])
     }
   }
+
+  const hasGroups = filtered.some(o => o.group)
 
   const label = selected.length === 0
     ? placeholder
@@ -85,13 +97,13 @@ function MultiSelect({
         <span className={cn("truncate", selected.length > 0 ? "text-gray-900" : "text-gray-500")}>{label}</span>
         <div className="flex items-center gap-1 shrink-0">
           {selected.length > 0 && (
-            <button
-              type="button"
-              onClick={e => { e.stopPropagation(); onChange([]); }}
-              className="text-gray-400 hover:text-gray-600"
+            <span
+              role="button"
+              onPointerDown={e => { e.stopPropagation(); e.preventDefault(); onChange([]); }}
+              className="text-gray-400 hover:text-gray-600 cursor-pointer"
             >
               <X size={10} />
-            </button>
+            </span>
           )}
           <ChevronDown size={11} className="text-gray-400" />
         </div>
@@ -120,7 +132,7 @@ function MultiSelect({
                 return (
                   <span key={v} className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-blue-50 text-blue-700 border border-blue-200">
                     {opt.label}
-                    <button type="button" onClick={() => toggle(v)}><X size={10} /></button>
+                    <span role="button" onPointerDown={e => { e.stopPropagation(); e.preventDefault(); toggle(v); }} className="cursor-pointer"><X size={10} /></span>
                   </span>
                 )
               })}
@@ -129,6 +141,40 @@ function MultiSelect({
           <div className="overflow-y-auto max-h-48">
             {filtered.length === 0 ? (
               <p className="p-3 text-[12px] text-gray-400 text-center">Aucun résultat</p>
+            ) : hasGroups ? (
+              GROUPES_ORDER.map(g => {
+                const list = filtered.filter(o => (o.group ?? "autre") === g)
+                if (list.length === 0) return null
+                return (
+                  <div key={g}>
+                    <div className="px-3 py-1 text-[9px] font-bold uppercase tracking-wider bg-gray-50 sticky top-0"
+                      style={{ color: GROUPE_COLORS[g] }}>
+                      {GROUPE_LABELS[g]}
+                    </div>
+                    {list.map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => toggle(opt.value)}
+                        className={cn(
+                          "w-full text-left px-3 py-2 text-[12px] hover:bg-gray-50 transition-colors flex items-center gap-2 border-b border-gray-50 last:border-0",
+                          selected.includes(opt.value) && "bg-blue-50 text-blue-700"
+                        )}
+                      >
+                        <span className={cn("w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0",
+                          selected.includes(opt.value) ? "bg-[#1B4F8A] border-[#1B4F8A]" : "border-gray-300")}>
+                          {selected.includes(opt.value) && (
+                            <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                            </svg>
+                          )}
+                        </span>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                )
+              })
             ) : (
               filtered.map(opt => (
                 <button
@@ -266,7 +312,7 @@ export default function DashboardFilters({ maladies, communes, wilayas, services
 
       {/* Maladies multi-select */}
       <MultiSelect
-        options={maladies.map(m => ({ value: m.id, label: m.nom }))}
+        options={maladies.map(m => ({ value: m.id, label: m.nom, group: m.groupeEpidemiologique ?? "autre" }))}
         selected={filters.maladieIds}
         onChange={maladieIds => onChange({ ...filters, maladieIds })}
         placeholder="Toutes maladies"

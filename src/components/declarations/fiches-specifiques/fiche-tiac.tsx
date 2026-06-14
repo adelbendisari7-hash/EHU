@@ -1,5 +1,7 @@
 "use client"
-import { UseFormRegister, UseFormWatch, FieldErrors } from "react-hook-form"
+import { UseFormRegister, UseFormWatch, UseFormSetValue, FieldErrors } from "react-hook-form"
+import DateInput from "@/components/shared/date-input"
+import { useFicheInit } from "@/hooks/use-fiche-init"
 
 interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -7,7 +9,11 @@ interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   watch: UseFormWatch<any>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setValue?: UseFormSetValue<any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errors: FieldErrors
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  initialData?: Record<string, any> | null
 }
 
 const SYMPTOMES = [
@@ -22,7 +28,8 @@ const SYMPTOMES = [
   { key: "urticaire", label: "Urticaire" },
 ]
 
-export default function FicheTiac({ register, watch, errors }: Props) {
+export default function FicheTiac({ register, watch, setValue, errors, initialData }: Props) {
+  useFicheInit(initialData, setValue)
   const devenir = watch("fiche.devenir")
   const germeIdentifie = watch("fiche.germeIdentifie")
   const complication = watch("fiche.complication")
@@ -43,7 +50,7 @@ export default function FicheTiac({ register, watch, errors }: Props) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date 1er signe clinique</label>
-            <input type="date" {...register("fiche.datePremierSigne")} className="input w-full" />
+            <DateInput name="fiche.datePremierSigne" watch={watch} setValue={setValue!} className="input w-full" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Délai d&apos;incubation (heures)</label>
@@ -67,7 +74,7 @@ export default function FicheTiac({ register, watch, errors }: Props) {
           {devenir === "deces" && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Date du décès</label>
-              <input type="date" {...register("fiche.dateDeces")} className="input w-full" />
+              <DateInput name="fiche.dateDeces" watch={watch} setValue={setValue!} className="input w-full" />
             </div>
           )}
         </div>
@@ -119,7 +126,7 @@ export default function FicheTiac({ register, watch, errors }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Date de consommation</label>
-              <input type="date" {...register("fiche.dateConsommation")} className="input w-full" />
+              <DateInput name="fiche.dateConsommation" watch={watch} setValue={setValue!} className="input w-full" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Heure</label>

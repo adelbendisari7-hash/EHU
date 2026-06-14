@@ -1,6 +1,8 @@
 "use client"
 import { UseFormRegister, UseFormWatch, UseFormSetValue, FieldErrors, useFieldArray, Control } from "react-hook-form"
 import { Plus, Trash2 } from "lucide-react"
+import DateInput from "@/components/shared/date-input"
+import { useFicheInit } from "@/hooks/use-fiche-init"
 
 interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -13,6 +15,8 @@ interface Props {
   errors: FieldErrors
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   control?: Control<any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  initialData?: Record<string, any> | null
 }
 
 const SIGNES_CLINIQUES = [
@@ -36,7 +40,8 @@ const FORMES_CLINIQUES = [
 ]
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function FicheDiphterie({ register, watch, setValue, errors, control }: Props) {
+export default function FicheDiphterie({ register, watch, setValue, errors, control, initialData }: Props) {
+  useFicheInit(initialData, setValue)
   const hospitalise = watch("fiche.hospitalise")
   const contactVoyageur = watch("fiche.contactVoyageur")
   const antibioAvantPrelevement = watch("fiche.antibioAvantPrelevement")
@@ -63,7 +68,7 @@ export default function FicheDiphterie({ register, watch, setValue, errors, cont
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;apparition des symptômes</label>
-            <input type="date" {...register("fiche.dateApparitionSymptomes")} className="input w-full" />
+            <DateInput name="fiche.dateApparitionSymptomes" watch={watch} setValue={setValue!} className="input w-full" />
           </div>
         </div>
         <div className="mt-3 space-y-2">
@@ -75,7 +80,7 @@ export default function FicheDiphterie({ register, watch, setValue, errors, cont
             <div className="grid grid-cols-3 gap-3 mt-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;hospitalisation</label>
-                <input type="date" {...register("fiche.dateHospitalisation")} className="input w-full" />
+                <DateInput name="fiche.dateHospitalisation" watch={watch} setValue={setValue!} className="input w-full" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Hôpital</label>
@@ -144,7 +149,7 @@ export default function FicheDiphterie({ register, watch, setValue, errors, cont
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nombre total de doses</label>
-            <input type="number" {...register("fiche.totalDosesVaccin", { valueAsNumber: true })} className="input w-full" />
+            <input type="number" {...register("fiche.totalDosesVaccin", { valueAsNumber: true })} min={0} className="input w-full" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Dates des doses</label>
@@ -211,7 +216,7 @@ export default function FicheDiphterie({ register, watch, setValue, errors, cont
                 </div>
                 <div>
                   <label className="block text-xs text-gray-600 mb-1">Date prélèvement</label>
-                  <input type="date" {...register(`fiche.prelevements.${index}.date`)} className="input w-full text-sm" />
+                  <DateInput name={`fiche.prelevements.${index}.date`} watch={watch} setValue={setValue!} className="input w-full text-sm" />
                 </div>
                 <div className="flex gap-2">
                   <div className="flex-1">
@@ -279,7 +284,7 @@ export default function FicheDiphterie({ register, watch, setValue, errors, cont
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                  <input type="date" {...register("fiche.dateSero")} className="input w-full" />
+                  <DateInput name="fiche.dateSero" watch={watch} setValue={setValue!} className="input w-full" />
                 </div>
               </div>
             )}
@@ -297,7 +302,7 @@ export default function FicheDiphterie({ register, watch, setValue, errors, cont
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Date de début</label>
-                  <input type="date" {...register("fiche.dateAntibio")} className="input w-full" />
+                  <DateInput name="fiche.dateAntibio" watch={watch} setValue={setValue!} className="input w-full" />
                 </div>
               </div>
             )}
@@ -331,7 +336,7 @@ export default function FicheDiphterie({ register, watch, setValue, errors, cont
               {evolution === "deces" && (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Date du décès</label>
-                  <input type="date" {...register("fiche.dateDeces")} className="input w-full" />
+                  <DateInput name="fiche.dateDeces" watch={watch} setValue={setValue!} className="input w-full" />
                 </div>
               )}
             </div>

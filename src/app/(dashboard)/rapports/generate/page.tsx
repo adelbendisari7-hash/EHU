@@ -4,6 +4,18 @@ import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ChevronDown, X, Check, FileText } from "lucide-react"
+import { SERVICES_EHU } from "@/constants/services"
+
+const CATEGORIE_OPTIONS = [
+  { value: "", label: "Toutes les catégories" },
+  { value: "pev", label: "PEV (Programme Élargi de Vaccination)" },
+  { value: "mth", label: "MTH (Maladies Transmissibles Hydriques)" },
+  { value: "zoonose", label: "Zoonoses" },
+  { value: "ist", label: "IST / VIH" },
+  { value: "vectorielle", label: "Maladies vectorielles" },
+  { value: "nosocomiale", label: "Infections nosocomiales" },
+  { value: "autre", label: "Autres maladies" },
+]
 
 const TYPES = [
   { value: "personnalise", label: "Personnalisé", desc: "Choisissez vos propres dates" },
@@ -13,12 +25,7 @@ const TYPES = [
   { value: "annuel", label: "Annuel", desc: "Année complète" },
 ]
 
-const DEFAULT_SERVICES = [
-  "Médecine interne", "Pédiatrie", "Chirurgie générale", "Maternité / Gynécologie-obstétrique",
-  "Cardiologie", "Pneumologie", "Neurologie", "Urgences", "Réanimation",
-  "Infectiologie", "Dermatologie", "ORL", "Ophtalmologie", "Traumatologie / Orthopédie",
-  "Hématologie", "Oncologie", "Gastro-entérologie", "Endocrinologie", "Psychiatrie", "Urologie",
-]
+const SERVICE_NAMES = SERVICES_EHU.map(s => s.nom)
 
 interface Template {
   id: string
@@ -26,6 +33,13 @@ interface Template {
   type: string
   sections: string[]
   description: string
+}
+
+interface MaladieOption {
+  id: string
+  nom: string
+  codeCim10: string
+  groupeEpidemiologique: string | null
 }
 
 function MultiSelectServices({
@@ -117,25 +131,32 @@ export default function GenerateRapportPage() {
   const [dateDebut, setDateDebut] = useState("")
   const [dateFin, setDateFin] = useState("")
   const [selectedServices, setSelectedServices] = useState<string[]>([])
-  const [serviceOptions, setServiceOptions] = useState<string[]>(DEFAULT_SERVICES)
+  const [serviceOptions, setServiceOptions] = useState<string[]>(SERVICE_NAMES)
   const [templates, setTemplates] = useState<Template[]>([])
   const [selectedModele, setSelectedModele] = useState<Template | null>(null)
+  const [maladies, setMaladies] = useState<MaladieOption[]>([])
+  const [maladieId, setMaladieId] = useState("")
+  const [categorieGroupe, setCategorieGroupe] = useState("")
+  const [maladieSearch, setMaladieSearch] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Load templates and existing services in parallel
+    // Load templates, services, and maladies in parallel
     Promise.all([
       fetch("/api/rapport-modeles").then(r => r.json()),
       fetch("/api/rapports/services").then(r => r.json()),
-    ]).then(([modeleData, svcData]) => {
+      fetch("/api/maladies?limit=200&isActive=true").then(r => r.json()),
+    ]).then(([modeleData, svcData, maladieData]) => {
       setTemplates((modeleData as { templates: Template[] }).templates ?? [])
       const fetched = (svcData as { services: string[] }).services ?? []
       if (fetched.length > 0) {
-        // Merge fetched services with defaults, dedup
-        const merged = Array.from(new Set([...fetched, ...DEFAULT_SERVICES]))
+        // Merge any DB-sourced services with SERVICES_EHU, dedup
+        const merged = Array.from(new Set([...SERVICE_NAMES, ...fetched]))
         setServiceOptions(merged)
       }
+      const m = (maladieData as { maladies?: MaladieOption[]; data?: MaladieOption[] })
+      setMaladies(m.maladies ?? m.data ?? (Array.isArray(maladieData) ? maladieData : []))
     }).catch(() => { /* use defaults silently */ })
 
     // Default to last month
@@ -194,6 +215,8 @@ export default function GenerateRapportPage() {
           dateFin,
           services: selectedServices,
           modeleId: selectedModele?.id ?? null,
+          maladieId: maladieId || null,
+          categorieGroupe: categorieGroupe || null,
         }),
       })
       if (!res.ok) {
@@ -313,6 +336,57 @@ export default function GenerateRapportPage() {
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Date de fin *</label>
               <input type="date" value={dateFin} onChange={e => setDateFin(e.target.value)} required className={inputCls} />
+            </div>
+          </div>
+        </div>
+
+        {/* Maladie + Category filters */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <h2 className="text-sm font-semibold text-gray-700 mb-1">
+            Filtres Pathologie <span className="font-normal text-gray-400">(optionnel)</span>
+          </h2>
+          <p className="text-xs text-gray-400 mb-4">Limitez le rapport à une maladie ou catégorie spécifique</p>
+          <div className="space-y-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Catégorie épidémiologique</label>
+              <select
+                value={categorieGroupe}
+                onChange={e => { setCategorieGroupe(e.target.value); setMaladieId(""); setMaladieSearch("") }}
+                className={inputCls}
+              >
+                {CATEGORIE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Maladie spécifique</label>
+              <div className="space-y-1.5">
+                <input
+                  type="text"
+                  placeholder="Rechercher une maladie..."
+                  value={maladieSearch}
+                  onChange={e => setMaladieSearch(e.target.value)}
+                  className={inputCls}
+                />
+                <select
+                  value={maladieId}
+                  onChange={e => { setMaladieId(e.target.value); if (e.target.value) setCategorieGroupe("") }}
+                  className={inputCls}
+                >
+                  <option value="">Toutes les maladies</option>
+                  {maladies
+                    .filter(m =>
+                      !maladieSearch ||
+                      m.nom.toLowerCase().includes(maladieSearch.toLowerCase()) ||
+                      m.codeCim10.toLowerCase().includes(maladieSearch.toLowerCase())
+                    )
+                    .map(m => (
+                      <option key={m.id} value={m.id}>{m.nom} ({m.codeCim10})</option>
+                    ))
+                  }
+                </select>
+              </div>
             </div>
           </div>
         </div>

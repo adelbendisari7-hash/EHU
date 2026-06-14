@@ -37,7 +37,7 @@ function FileIcon({ name }: { name: string }) {
     : <Image size={16} className="text-blue-500 shrink-0" />
 }
 
-export function FileUpload({ label, files, onChange, maxFiles = 5, compact = false }: FileUploadProps) {
+export function FileUpload({ label, files = [], onChange, maxFiles = 5, compact = false }: FileUploadProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)

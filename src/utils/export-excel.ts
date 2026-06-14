@@ -18,10 +18,10 @@ export interface CasRow {
 
 export interface AnalyticsExcelData {
   summary: { total: number; confirmes: number; tauxConfirmation: number; maladiesDeclarees: number; totalMaladies: number; communesTouchees: number }
-  prevalence: { name: string; count: number }[]
+  categorieDistribution: { name: string; key: string; count: number }[]
+  evolutionDistribution: { name: string; count: number }[]
   ageDistribution: { name: string; count: number }[]
   sexDistribution: { name: string; count: number }[]
-  statutDistribution: { name: string; count: number }[]
   weeklyTrend: { date: string; count: number }[]
   period: string
 }
@@ -99,15 +99,16 @@ export async function exportAnalysesExcel(data: AnalyticsExcelData) {
   wsSummary["!cols"] = [{ wch: 28 }, { wch: 20 }]
   XLSX.utils.book_append_sheet(wb, wsSummary, "Résumé")
 
-  // Sheet 2 — Prevalence by disease
-  const prevalenceRows = data.prevalence.map(d => ({
-    "Maladie": d.name,
+  // Sheet 2 — Category distribution
+  const catTotal = data.categorieDistribution.reduce((s, d) => s + d.count, 0)
+  const catRows = data.categorieDistribution.map(d => ({
+    "Catégorie": d.name,
     "Nombre de Cas": d.count,
-    "% du Total": data.summary.total > 0 ? `${Math.round((d.count / data.summary.total) * 100)}%` : "0%",
+    "% du Total": catTotal > 0 ? `${Math.round((d.count / catTotal) * 100)}%` : "0%",
   }))
-  const wsPrevalence = XLSX.utils.json_to_sheet(prevalenceRows)
-  wsPrevalence["!cols"] = [{ wch: 35 }, { wch: 18 }, { wch: 15 }]
-  XLSX.utils.book_append_sheet(wb, wsPrevalence, "Prévalence Maladies")
+  const wsCat = XLSX.utils.json_to_sheet(catRows)
+  wsCat["!cols"] = [{ wch: 20 }, { wch: 18 }, { wch: 15 }]
+  XLSX.utils.book_append_sheet(wb, wsCat, "Par Catégorie")
 
   // Sheet 3 — Weekly trend
   const trendRows = data.weeklyTrend.map(d => ({
@@ -129,9 +130,6 @@ export async function exportAnalysesExcel(data: AnalyticsExcelData) {
   XLSX.utils.book_append_sheet(wb, wsAge, "Répartition par Âge")
 
   // Sheet 5 — Sex distribution
-  const STATUT_LABELS: Record<string, string> = {
-    brouillon: "Brouillon", suspect: "Suspect", confirme: "Confirmé",
-  }
   const sexRows = data.sexDistribution.map(d => ({
     "Sexe": d.name === "M" ? "Masculin" : d.name === "F" ? "Féminin" : d.name,
     "Nombre de Cas": d.count,
@@ -141,15 +139,16 @@ export async function exportAnalysesExcel(data: AnalyticsExcelData) {
   wsSex["!cols"] = [{ wch: 15 }, { wch: 18 }, { wch: 15 }]
   XLSX.utils.book_append_sheet(wb, wsSex, "Répartition par Sexe")
 
-  // Sheet 6 — Statut distribution
-  const statutRows = data.statutDistribution.map(d => ({
-    "Statut": STATUT_LABELS[d.name] ?? d.name,
+  // Sheet 6 — Evolution distribution
+  const evolutionTotal = data.evolutionDistribution.reduce((s, d) => s + d.count, 0)
+  const evolutionRows = data.evolutionDistribution.map(d => ({
+    "Évolution": d.name,
     "Nombre de Cas": d.count,
-    "% du Total": data.summary.total > 0 ? `${Math.round((d.count / data.summary.total) * 100)}%` : "0%",
+    "% du Total": evolutionTotal > 0 ? `${Math.round((d.count / evolutionTotal) * 100)}%` : "0%",
   }))
-  const wsStatut = XLSX.utils.json_to_sheet(statutRows)
-  wsStatut["!cols"] = [{ wch: 18 }, { wch: 18 }, { wch: 15 }]
-  XLSX.utils.book_append_sheet(wb, wsStatut, "Répartition par Statut")
+  const wsEvolution = XLSX.utils.json_to_sheet(evolutionRows)
+  wsEvolution["!cols"] = [{ wch: 25 }, { wch: 18 }, { wch: 15 }]
+  XLSX.utils.book_append_sheet(wb, wsEvolution, "Évolution")
 
   const dateStr = new Date().toISOString().slice(0, 10)
   XLSX.writeFile(wb, `rapport-analyses-ehu-${dateStr}.xlsx`)

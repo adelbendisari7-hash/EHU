@@ -116,6 +116,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ casId:
         ...(body.dateHospitalisation !== undefined && { dateHospitalisation: body.dateHospitalisation ? new Date(body.dateHospitalisation) : null }),
         ...(body.structureHospitalisationId !== undefined && { structureHospitalisationId: body.structureHospitalisationId || null }),
         ...(body.serviceHospitalisation !== undefined && { serviceHospitalisation: body.serviceHospitalisation || null }),
+        ...(body.typeBmrId !== undefined && { typeBmrId: body.typeBmrId || null }),
         ...(body.estEvacue !== undefined && { estEvacue: body.estEvacue }),
         ...(body.dateEvacuation !== undefined && { dateEvacuation: body.dateEvacuation ? new Date(body.dateEvacuation) : null }),
         ...(body.structureEvacuation !== undefined && { structureEvacuation: body.structureEvacuation || null }),

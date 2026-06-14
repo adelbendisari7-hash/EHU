@@ -9,19 +9,26 @@ import {
 } from "recharts"
 import { exportRapportPdfAvecGraphiques } from "@/utils/export-pdf"
 import { exportAnalysesExcel } from "@/utils/export-excel"
+import { formatDate, formatDateTime } from "@/utils/format-date"
 import {
   FileText, FileSpreadsheet, ArrowLeft, Printer,
   Activity, CheckCircle, AlertTriangle, Search,
-  Calendar, Building2, TrendingUp, Users,
+  Calendar, Building2, TrendingUp, Users, BedDouble, Navigation,
 } from "lucide-react"
 
 const VIS_ALL = [
+  "indicateurs_cles",
   "histogramme_maladies",
   "courbe_temporelle",
   "pyramide_ages",
   "camembert_statuts",
   "distribution_services",
   "tableau_recapitulatif",
+  "camembert_categories",
+  "distribution_evolution",
+  "repartition_sexe",
+  "distribution_communes",
+  "distribution_wilaya",
 ]
 
 const PALETTE = ["#1B4F8A", "#2E7D32", "#E65100", "#6A1B9A", "#00838F", "#AD1457", "#4E342E", "#37474F"]
@@ -48,12 +55,14 @@ function KpiCard({
   value,
   color,
   sub,
+  pct,
 }: {
   icon: React.ElementType
   label: string
   value: number
   color: string
   sub?: string
+  pct?: number
 }) {
   return (
     <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 flex items-start gap-4">
@@ -62,7 +71,12 @@ function KpiCard({
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-0.5 truncate">{label}</p>
-        <p className="text-3xl font-bold text-gray-800">{value.toLocaleString("fr-DZ")}</p>
+        <p className="text-3xl font-bold text-gray-800">
+          {value.toLocaleString("fr-DZ")}
+          {pct !== undefined && (
+            <span className="text-base font-medium text-gray-400 ml-2">({pct}%)</span>
+          )}
+        </p>
         {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
       </div>
     </div>
@@ -107,15 +121,15 @@ export default function RapportDetailPage() {
   const handleExcel = async () => {
     setExportLoading("excel")
     try {
-      const period = `${new Date(rapport.dateDebut).toLocaleDateString("fr-FR")} — ${new Date(rapport.dateFin).toLocaleDateString("fr-FR")}`
+      const period = `${formatDate(rapport.dateDebut)} — ${formatDate(rapport.dateFin)}`
       const d = rapport.donnees
       await exportAnalysesExcel({
         summary: d.summary,
-        prevalence: d.casByMaladie?.map((r: { maladie: string; count: number }) => ({ name: r.maladie, count: r.count })) ?? [],
+        categorieDistribution: d.categorieDistribution ?? [],
+        evolutionDistribution: d.evolutionDistribution ?? [],
         weeklyTrend: d.weeklyTrend ?? [],
         ageDistribution: d.ageDistribution ?? [],
         sexDistribution: d.sexDistribution ?? [],
-        statutDistribution: d.statutDistribution ?? [],
         period,
       })
     } finally { setExportLoading(null) }
@@ -145,9 +159,9 @@ export default function RapportDetailPage() {
   const vis: string[] = d.visualisations?.length > 0 ? d.visualisations : VIS_ALL
   const hasVis = (key: string) => vis.includes(key)
 
-  const dateDebut = new Date(rapport.dateDebut).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
-  const dateFin = new Date(rapport.dateFin).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric" })
-  const dateGeneration = new Date(rapport.createdAt).toLocaleDateString("fr-FR", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+  const dateDebut = formatDate(rapport.dateDebut)
+  const dateFin = formatDate(rapport.dateFin)
+  const dateGeneration = formatDateTime(rapport.createdAt)
 
   const tauxConfirmation = d.summary?.total > 0
     ? Math.round((d.summary.confirmes / d.summary.total) * 100)
@@ -242,7 +256,9 @@ export default function RapportDetailPage() {
       </div>
 
       {/* ── Indicateurs clés ───────────────────────────────────────── */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      {hasVis("indicateurs_cles") && (
+      <>
+      <div className="grid grid-cols-4 gap-4 mb-3">
         <KpiCard
           icon={Users}
           label="Total Cas déclarés"
@@ -272,6 +288,26 @@ export default function RapportDetailPage() {
           sub="Enquêtes épidémio."
         />
       </div>
+      <div className="grid grid-cols-2 gap-4 mb-6">
+        <KpiCard
+          icon={BedDouble}
+          label="Hospitalisations"
+          value={d.summary?.hospitalisations ?? 0}
+          pct={d.summary?.tauxHospitalisation ?? 0}
+          color="#00838F"
+          sub="des cas déclarés"
+        />
+        <KpiCard
+          icon={Navigation}
+          label="Évacuations"
+          value={d.summary?.evacuations ?? 0}
+          pct={d.summary?.tauxEvacuation ?? 0}
+          color="#AD1457"
+          sub="des cas déclarés"
+        />
+      </div>
+      </>
+      )}
 
       {/* ── Distribution par maladie + Tendance hebdomadaire ──────── */}
       {(d.casByMaladie?.length > 0 || d.weeklyTrend?.length > 0) && (hasVis("histogramme_maladies") || hasVis("courbe_temporelle")) && (
@@ -335,7 +371,7 @@ export default function RapportDetailPage() {
       {/* ── Cas par service ────────────────────────────────────────── */}
       {d.casByService?.length > 0 && hasVis("distribution_services") && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4">
-          <SectionTitle>Répartition par Service Hospitalier</SectionTitle>
+          <SectionTitle>Top 7 Services Hospitaliers Déclarants</SectionTitle>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -482,6 +518,152 @@ export default function RapportDetailPage() {
               </tr>
             </tfoot>
           </table>
+        </div>
+      )}
+
+      {/* ── Catégories + Évolution ────────────────────────────────── */}
+      {(hasVis("camembert_categories") || hasVis("distribution_evolution")) && (
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          {d.categorieDistribution?.length > 0 && hasVis("camembert_categories") && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <SectionTitle>Répartition par Catégorie Épidémiologique</SectionTitle>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={d.categorieDistribution} margin={{ left: -16, right: 8, top: 4, bottom: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F0F0F0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#9CA3AF" }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: "#9CA3AF" }} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "8px", fontSize: "12px", border: "1px solid #E5E7EB" }}
+                    formatter={(val) => [`${Number(val ?? 0)} cas`, "Catégorie"]}
+                  />
+                  <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={32}>
+                    {d.categorieDistribution.map((_: unknown, i: number) => (
+                      <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {d.evolutionDistribution?.length > 0 && hasVis("distribution_evolution") && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <SectionTitle>Distribution par Évolution Clinique</SectionTitle>
+              <div className="grid grid-cols-2 gap-4 mt-1">
+                <ResponsiveContainer width="100%" height={180}>
+                  <PieChart>
+                    <Pie
+                      data={d.evolutionDistribution.map((e: { name: string; count: number }) => ({ name: e.name, value: e.count }))}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={40}
+                      outerRadius={72}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {d.evolutionDistribution.map((_: unknown, i: number) => (
+                        <Cell key={i} fill={PALETTE[i % PALETTE.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ borderRadius: "8px", fontSize: "12px", border: "1px solid #E5E7EB" }}
+                      formatter={(val) => [`${Number(val ?? 0)} cas`, ""]}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex flex-col justify-center gap-1.5">
+                  {d.evolutionDistribution.map((e: { name: string; count: number }, i: number) => (
+                    <div key={e.name} className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: PALETTE[i % PALETTE.length] }} />
+                      <p className="text-xs text-gray-600 truncate">{e.name} <span className="font-semibold text-gray-800">{e.count}</span></p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Sexe + Communes ───────────────────────────────────────── */}
+      {(hasVis("repartition_sexe") || hasVis("distribution_communes")) && (
+        <div className="grid grid-cols-2 gap-4 mb-4">
+          {d.sexDistribution?.length > 0 && hasVis("repartition_sexe") && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <SectionTitle>Répartition par Sexe</SectionTitle>
+              <div className="flex items-center justify-center gap-8 mt-4">
+                {d.sexDistribution.map((s: { name: string; count: number }, i: number) => {
+                  const total = d.sexDistribution.reduce((a: number, b: { count: number }) => a + b.count, 0)
+                  const pct = total > 0 ? Math.round((s.count / total) * 100) : 0
+                  return (
+                    <div key={s.name} className="flex flex-col items-center gap-1">
+                      <div className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-lg" style={{ backgroundColor: PALETTE[i % PALETTE.length] }}>
+                        {pct}%
+                      </div>
+                      <p className="text-xs font-semibold text-gray-700">{s.name}</p>
+                      <p className="text-xs text-gray-400">{s.count} cas</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {d.communeDistribution?.length > 0 && hasVis("distribution_communes") && (
+            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+              <SectionTitle>Top 10 Communes Touchées</SectionTitle>
+              <div className="space-y-2 mt-1">
+                {d.communeDistribution.slice(0, 8).map((c: { name: string; count: number }, i: number) => {
+                  const max = d.communeDistribution[0]?.count ?? 1
+                  const pct = Math.round((c.count / max) * 100)
+                  return (
+                    <div key={c.name} className="flex items-center gap-2">
+                      <p className="text-xs text-gray-600 w-28 shrink-0 truncate">{c.name}</p>
+                      <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: PALETTE[i % PALETTE.length] }} />
+                      </div>
+                      <p className="text-xs font-semibold text-gray-700 w-8 text-right">{c.count}</p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Wilaya distribution ───────────────────────────────────── */}
+      {d.wilayadDistribution?.length > 0 && hasVis("distribution_wilaya") && (
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-4">
+          <SectionTitle>Distribution par Wilaya</SectionTitle>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left text-xs font-semibold text-gray-400 uppercase tracking-wide pb-2">Wilaya</th>
+                  <th className="text-right text-xs font-semibold text-gray-400 uppercase tracking-wide pb-2">Cas déclarés</th>
+                  <th className="pb-2 w-40"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {d.wilayadDistribution.map((w: { name: string; count: number }, i: number) => {
+                  const total = d.wilayadDistribution.reduce((a: number, b: { count: number }) => a + b.count, 0)
+                  const pct = total > 0 ? Math.round((w.count / total) * 100) : 0
+                  return (
+                    <tr key={w.name} className="hover:bg-gray-50/50">
+                      <td className="py-2 font-medium text-gray-800">{w.name}</td>
+                      <td className="py-2 text-right font-semibold text-gray-700">{w.count}</td>
+                      <td className="py-2 pl-4">
+                        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: PALETTE[i % PALETTE.length] }} />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

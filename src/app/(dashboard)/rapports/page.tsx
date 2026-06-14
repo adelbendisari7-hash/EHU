@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { FileBarChart, Plus, Eye, AlertCircle, RefreshCw } from "lucide-react"
 import { RapportListSkeleton } from "@/components/shared/skeleton"
+import { formatDate } from "@/utils/format-date"
 
 interface Rapport {
   id: string
@@ -116,7 +117,7 @@ export default function RapportsPage() {
                 <div>
                   <p className="text-sm font-semibold text-gray-800">{r.titre}</p>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {new Date(r.dateDebut).toLocaleDateString("fr-FR")} → {new Date(r.dateFin).toLocaleDateString("fr-FR")}
+                    {formatDate(r.dateDebut)} → {formatDate(r.dateFin)}
                     <span className="mx-2">•</span>
                     {r.generePar === "systeme" ? "Auto-généré" : "Manuel"}
                   </p>

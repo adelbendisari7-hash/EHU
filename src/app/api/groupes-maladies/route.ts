@@ -7,7 +7,7 @@ export async function GET() {
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
 
   const maladies = await prisma.maladie.findMany({
-    where: { isActive: true, groupeEpidemiologique: { not: null } },
+    where: { isActive: true, categorie: { not: "categorie_3_bmr" }, groupeEpidemiologique: { not: null } },
     orderBy: { nom: "asc" },
     select: {
       id: true,

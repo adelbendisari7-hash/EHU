@@ -416,17 +416,14 @@ export async function printCasPdf(cas: CasPdfData) {
 // ---------- Analytics / Rapport mensuel PDF ----------
 export interface AnalyticsPdfData {
   summary: { total: number; confirmes: number; tauxConfirmation: number; maladiesDeclarees: number; totalMaladies: number; communesTouchees: number }
-  prevalence: { name: string; count: number }[]
+  categorieDistribution: { name: string; key: string; count: number }[]
+  evolutionDistribution: { name: string; count: number }[]
   weeklyTrend: { date: string; count: number }[]
   ageDistribution: { name: string; count: number }[]
   sexDistribution: { name: string; count: number }[]
-  statutDistribution: { name: string; count: number }[]
   period: string
 }
 
-const STATUT_LABELS: Record<string, string> = {
-  brouillon: "Brouillon", suspect: "Suspect", confirme: "Confirmé",
-}
 
 export async function exportAnalysesPdf(data: AnalyticsPdfData) {
   const { default: jsPDF } = await import("jspdf")
@@ -468,23 +465,22 @@ export async function exportAnalysesPdf(data: AnalyticsPdfData) {
   doc.setFontSize(8.5)
   doc.setFont("helvetica", "bold")
   doc.setTextColor(...EHU_BLUE)
-  doc.text("PRÉVALENCE PAR MALADIE DÉCLARABLE", 10, y)
+  doc.text("RÉPARTITION PAR CATÉGORIE DE MALADIE", 10, y)
   y += 4
 
   autoTable(doc, {
     startY: y,
-    head: [["Maladie", "Cas", "% du Total", "Tendance"]],
-    body: data.prevalence.map((d, idx) => [
+    head: [["Catégorie", "Cas", "% du Total"]],
+    body: data.categorieDistribution.map(d => [
       d.name,
       String(d.count),
       data.summary.total > 0 ? `${Math.round((d.count / data.summary.total) * 100)}%` : "0%",
-      idx === 0 ? "▲ Prédominant" : "",
     ]),
     headStyles: { fillColor: EHU_BLUE, textColor: WHITE, fontSize: 8, fontStyle: "bold" },
     bodyStyles: { fontSize: 7.5, textColor: TEXT_DARK },
     alternateRowStyles: { fillColor: LIGHT_GRAY },
     styles: { cellPadding: 2.5, lineColor: [225, 228, 232] as [number, number, number], lineWidth: 0.3 },
-    columnStyles: { 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center", fontStyle: "italic", textColor: [5, 150, 105] } },
+    columnStyles: { 1: { halign: "center" }, 2: { halign: "center" } },
     margin: { left: 10, right: 10 },
   })
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
@@ -540,18 +536,18 @@ export async function exportAnalysesPdf(data: AnalyticsPdfData) {
 
   if (y > 230) { doc.addPage(); y = 20 }
 
-  // ── Statuts ──
+  // ── Évolution ──
   doc.setFontSize(8.5)
   doc.setFont("helvetica", "bold")
   doc.setTextColor(...EHU_BLUE)
-  doc.text("RÉPARTITION PAR STATUT DE CAS", 10, y)
+  doc.text("RÉPARTITION PAR ÉVOLUTION DES CAS", 10, y)
   y += 4
 
   autoTable(doc, {
     startY: y,
-    head: [["Statut", "Nombre de Cas", "Proportion"]],
-    body: data.statutDistribution.map(d => [
-      STATUT_LABELS[d.name] ?? d.name,
+    head: [["Évolution", "Nombre de Cas", "Proportion"]],
+    body: data.evolutionDistribution.map(d => [
+      d.name,
       String(d.count),
       data.summary.total > 0 ? `${Math.round((d.count / data.summary.total) * 100)}%` : "0%",
     ]),
@@ -728,16 +724,16 @@ export async function printAnalysesPdf(data: AnalyticsPdfData) {
   y += 26
 
   doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.setTextColor(...EHU_BLUE)
-  doc.text("PRÉVALENCE PAR MALADIE DÉCLARABLE", 10, y); y += 4
+  doc.text("RÉPARTITION PAR CATÉGORIE DE MALADIE", 10, y); y += 4
 
   autoTable(doc, {
     startY: y,
-    head: [["Maladie", "Cas", "% du Total", "Tendance"]],
-    body: data.prevalence.map((d, idx) => [d.name, String(d.count), data.summary.total > 0 ? `${Math.round((d.count / data.summary.total) * 100)}%` : "0%", idx === 0 ? "▲ Prédominant" : ""]),
+    head: [["Catégorie", "Cas", "% du Total"]],
+    body: data.categorieDistribution.map(d => [d.name, String(d.count), data.summary.total > 0 ? `${Math.round((d.count / data.summary.total) * 100)}%` : "0%"]),
     headStyles: { fillColor: EHU_BLUE, textColor: WHITE, fontSize: 8, fontStyle: "bold" },
     bodyStyles: { fontSize: 7.5, textColor: TEXT_DARK }, alternateRowStyles: { fillColor: LIGHT_GRAY },
     styles: { cellPadding: 2.5, lineColor: [225, 228, 232] as [number, number, number], lineWidth: 0.3 },
-    columnStyles: { 1: { halign: "center" }, 2: { halign: "center" }, 3: { halign: "center", fontStyle: "italic", textColor: [5, 150, 105] } },
+    columnStyles: { 1: { halign: "center" }, 2: { halign: "center" } },
     margin: { left: 10, right: 10 },
   })
   y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 8
@@ -762,9 +758,9 @@ export async function printAnalysesPdf(data: AnalyticsPdfData) {
   if (y > 230) { doc.addPage(); y = 20 }
 
   doc.setFontSize(8.5); doc.setFont("helvetica", "bold"); doc.setTextColor(...EHU_BLUE)
-  doc.text("RÉPARTITION PAR STATUT DE CAS", 10, y); y += 4
+  doc.text("RÉPARTITION PAR ÉVOLUTION DES CAS", 10, y); y += 4
   autoTable(doc, {
-    startY: y, head: [["Statut", "Nombre de Cas", "Proportion"]], body: data.statutDistribution.map(d => [STATUT_LABELS[d.name] ?? d.name, String(d.count), data.summary.total > 0 ? `${Math.round((d.count / data.summary.total) * 100)}%` : "0%"]),
+    startY: y, head: [["Évolution", "Nombre de Cas", "Proportion"]], body: data.evolutionDistribution.map(d => [d.name, String(d.count), data.summary.total > 0 ? `${Math.round((d.count / data.summary.total) * 100)}%` : "0%"]),
     headStyles: { fillColor: EHU_BLUE, textColor: WHITE, fontSize: 8, fontStyle: "bold" }, bodyStyles: { fontSize: 8, textColor: TEXT_DARK }, alternateRowStyles: { fillColor: LIGHT_GRAY },
     styles: { cellPadding: 3, lineColor: [225, 228, 232] as [number, number, number], lineWidth: 0.3 }, columnStyles: { 1: { halign: "center" }, 2: { halign: "center" } },
     margin: { left: 10, right: 10 },

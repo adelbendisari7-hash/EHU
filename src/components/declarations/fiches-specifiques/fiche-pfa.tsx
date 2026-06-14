@@ -1,5 +1,7 @@
 "use client"
-import { UseFormRegister, UseFormWatch, FieldErrors } from "react-hook-form"
+import { UseFormRegister, UseFormWatch, UseFormSetValue, FieldErrors } from "react-hook-form"
+import DateInput from "@/components/shared/date-input"
+import { useFicheInit } from "@/hooks/use-fiche-init"
 
 interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -7,10 +9,15 @@ interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   watch: UseFormWatch<any>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setValue?: UseFormSetValue<any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errors: FieldErrors
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  initialData?: Record<string, any> | null
 }
 
-export default function FichePfa({ register, watch, errors }: Props) {
+export default function FichePfa({ register, watch, setValue, errors, initialData }: Props) {
+  useFicheInit(initialData, setValue)
   const hospitalise = watch("fiche.hospitalise")
   const confirmationPfa = watch("fiche.confirmationPfa")
 
@@ -77,11 +84,11 @@ export default function FichePfa({ register, watch, errors }: Props) {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date de notification</label>
-            <input type="date" {...register("fiche.dateNotification")} className="input w-full" />
+            <DateInput name="fiche.dateNotification" watch={watch} setValue={setValue!} className="input w-full" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;investigation</label>
-            <input type="date" {...register("fiche.dateInvestigation")} className="input w-full" />
+            <DateInput name="fiche.dateInvestigation" watch={watch} setValue={setValue!} className="input w-full" />
           </div>
         </div>
       </div>
@@ -98,7 +105,7 @@ export default function FichePfa({ register, watch, errors }: Props) {
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;hospitalisation</label>
-                <input type="date" {...register("fiche.dateHospitalisation")} className="input w-full" />
+                <DateInput name="fiche.dateHospitalisation" watch={watch} setValue={setValue!} className="input w-full" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">N° dossier</label>
@@ -138,7 +145,7 @@ export default function FichePfa({ register, watch, errors }: Props) {
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Date d&apos;apparition de la paralysie</label>
-              <input type="date" {...register("fiche.dateApparitionParalysie")} className="input w-full" />
+              <DateInput name="fiche.dateApparitionParalysie" watch={watch} setValue={setValue!} className="input w-full" />
             </div>
           </div>
           <div>
@@ -239,19 +246,19 @@ export default function FichePfa({ register, watch, errors }: Props) {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date prélèvement 1</label>
-            <input type="date" {...register("fiche.datePrelevement1")} className="input w-full" />
+            <DateInput name="fiche.datePrelevement1" watch={watch} setValue={setValue!} className="input w-full" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date prélèvement 2</label>
-            <input type="date" {...register("fiche.datePrelevement2")} className="input w-full" />
+            <DateInput name="fiche.datePrelevement2" watch={watch} setValue={setValue!} className="input w-full" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date envoi PEV</label>
-            <input type="date" {...register("fiche.dateEnvoiPev")} className="input w-full" />
+            <DateInput name="fiche.dateEnvoiPev" watch={watch} setValue={setValue!} className="input w-full" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Date envoi labo</label>
-            <input type="date" {...register("fiche.dateEnvoiLabo")} className="input w-full" />
+            <DateInput name="fiche.dateEnvoiLabo" watch={watch} setValue={setValue!} className="input w-full" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">État à la réception</label>

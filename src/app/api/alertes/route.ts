@@ -27,7 +27,7 @@ export async function GET(req: Request) {
     where,
     orderBy: { createdAt: "desc" },
     include: {
-      maladie: { select: { nom: true } },
+      maladie: { select: { nom: true, delaiNotificationHeures: true, frequenceDeclaration: true } },
       commune: { select: { nom: true } },
       auteur: { select: { firstName: true, lastName: true } },
     },

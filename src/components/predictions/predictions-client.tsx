@@ -12,7 +12,7 @@ import { DashboardSkeleton } from "@/components/shared/skeleton"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface Maladie { id: string; nom: string }
+interface Maladie { id: string; nom: string; groupeEpidemiologique?: string | null }
 interface Commune { id: string; nom: string; wilayadId?: string }
 interface Wilaya { id: string; nom: string; code: string }
 

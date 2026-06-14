@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Biohazard, Plus, Search, Filter, ChevronLeft, ChevronRight, X, AlertCircle, CheckCircle } from "lucide-react"
+import { formatDate } from "@/utils/format-date"
 
 interface Germe { id: string; nom: string; type: string | null }
 interface Service { id: string; nom: string; codeService: string }
@@ -304,7 +305,7 @@ export default function UhhIasPage() {
                         ) : <span style={{ color: "#D1D5DB" }}>—</span>}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-xs" style={{ color: "#374151" }}>
-                        {new Date(inf.dateDetection).toLocaleDateString("fr-FR")}
+                        {formatDate(inf.dateDetection)}
                       </td>
                       <td className="px-4 py-3 text-xs" style={{ color: "#374151" }}>
                         {inf.agePatient ? `${inf.agePatient} ans` : "—"}

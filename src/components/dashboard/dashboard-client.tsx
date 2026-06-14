@@ -21,7 +21,7 @@ const EpidemicMap = dynamic(() => import("@/components/maps/epidemic-map"), {
   ),
 })
 
-interface Maladie { id: string; nom: string }
+interface Maladie { id: string; nom: string; groupeEpidemiologique?: string | null }
 interface Commune { id: string; nom: string; wilayadId?: string }
 interface Wilaya { id: string; nom: string; code: string }
 
@@ -133,7 +133,7 @@ export default function DashboardClient({ maladies, communes, wilayas, userName 
           <div className="card p-5">
             <div className="flex items-center justify-between mb-4">
               <p className="card-title">Carte Épidémique</p>
-              <span className="text-[11px] text-gray-400 font-medium">Wilaya d&apos;Oran</span>
+              <span className="text-[11px] text-gray-400 font-medium">Toutes wilayas</span>
             </div>
             <div className="rounded-lg overflow-hidden" style={{ height: "340px" }}>
               <EpidemicMap

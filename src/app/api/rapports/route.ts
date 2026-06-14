@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { writeAudit, getIp } from "@/lib/audit"
+import { formatDate } from "@/utils/format-date"
 
 export async function GET(req: Request) {
   const session = await auth()
@@ -45,20 +46,51 @@ export async function POST(req: Request) {
       : body.service ? [String(body.service).trim()] : []
 
     const modeleId: string | null = body.modeleId ?? null
+    const maladieIdFilter: string | null = body.maladieId ?? null
+    const categorieGroupeFilter: string | null = body.categorieGroupe ?? null
 
     const since = dateDebut
     const until = new Date(dateFin)
     until.setHours(23, 59, 59, 999)
 
+    // Resolve category → maladie IDs filter
+    let maladieIdIn: string[] | null = null
+    if (maladieIdFilter) {
+      maladieIdIn = [maladieIdFilter]
+    } else if (categorieGroupeFilter) {
+      const maladesInCat = await prisma.maladie.findMany({
+        where: { groupeEpidemiologique: categorieGroupeFilter, isActive: true },
+        select: { id: true },
+      })
+      maladieIdIn = maladesInCat.map(m => m.id)
+    }
+
     const baseWhere = {
       createdAt: { gte: since, lte: until },
       statut: { not: "brouillon" as const },
-      ...(servicesFilter.length ? { service: { in: servicesFilter } } : {}),
+      ...(servicesFilter.length ? { serviceDeclarant: { in: servicesFilter } } : {}),
+      ...(maladieIdIn ? { maladieId: { in: maladieIdIn } } : {}),
     }
 
-    const [totalCas, casByMaladieRaw, casByCommuneRaw, casByServiceRaw, weeklyRaw, ageRaw, statutRaw, totalAlertes, totalInvestigations] =
+    // Fetch template visualisations if modeleId provided
+    let templateVisualisations: string[] = []
+    if (modeleId) {
+      const TEMPLATE_DATE = new Date("1970-01-01T00:00:00Z")
+      const tmpl = await prisma.rapport.findFirst({
+        where: { id: modeleId, dateDebut: TEMPLATE_DATE, dateFin: TEMPLATE_DATE },
+        select: { donnees: true },
+      })
+      if (tmpl) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        templateVisualisations = (tmpl.donnees as any)?.visualisations ?? []
+      }
+    }
+
+    const [totalCas, totalHospitalises, totalEvacues, casByMaladieRaw, casByCommuneRaw, casByServiceRaw, weeklyRaw, ageRaw, statutRaw, totalAlertes, totalInvestigations, byEvolutionRaw, bySexRaw] =
       await Promise.all([
         prisma.casDeclare.count({ where: baseWhere }),
+        prisma.casDeclare.count({ where: { ...baseWhere, estHospitalise: true } }),
+        prisma.casDeclare.count({ where: { ...baseWhere, estEvacue: true } }),
 
         prisma.casDeclare.groupBy({
           by: ["maladieId"],
@@ -71,19 +103,21 @@ export async function POST(req: Request) {
           by: ["communeId"],
           _count: { _all: true },
           where: baseWhere,
+          orderBy: { _count: { communeId: "desc" } },
         }),
 
         prisma.casDeclare.groupBy({
-          by: ["service"],
+          by: ["serviceDeclarant"],
           _count: { _all: true },
           where: baseWhere,
-          orderBy: { _count: { service: "desc" } },
+          orderBy: { _count: { serviceDeclarant: "desc" } },
         }),
 
         prisma.$queryRaw<{ week: string; count: bigint }[]>`
           SELECT to_char(date_trunc('week', created_at), 'DD/MM') as week, COUNT(*)::int as count
           FROM cas_declares
           WHERE created_at >= ${since} AND created_at <= ${until}
+          AND statut != 'brouillon'
           GROUP BY date_trunc('week', created_at)
           ORDER BY date_trunc('week', created_at)
         `,
@@ -102,6 +136,7 @@ export async function POST(req: Request) {
           FROM cas_declares c
           JOIN patients p ON p.id = c.patient_id
           WHERE c.created_at >= ${since} AND c.created_at <= ${until}
+          AND c.statut != 'brouillon'
           GROUP BY tranche
           ORDER BY tranche
         `,
@@ -114,17 +149,87 @@ export async function POST(req: Request) {
 
         prisma.alerte.count({ where: { createdAt: { gte: since, lte: until } } }),
         prisma.investigation.count({ where: { createdAt: { gte: since, lte: until } } }),
+
+        prisma.casDeclare.groupBy({
+          by: ["evolution"],
+          _count: { _all: true },
+          where: { ...baseWhere, evolution: { not: null } },
+        }),
+
+        prisma.$queryRaw<{ sex: string; count: bigint }[]>`
+          SELECT p.sex, COUNT(*)::int as count
+          FROM cas_declares c
+          JOIN patients p ON p.id = c.patient_id
+          WHERE c.created_at >= ${since} AND c.created_at <= ${until}
+          AND c.statut != 'brouillon'
+          GROUP BY p.sex
+        `,
       ])
 
-    // Resolve maladie names
+    // Resolve maladie names + groups
     const maladieIds = casByMaladieRaw.map(r => r.maladieId).filter(Boolean) as string[]
-    const maladies = await prisma.maladie.findMany({ where: { id: { in: maladieIds } }, select: { id: true, nom: true } })
+    const maladies = await prisma.maladie.findMany({
+      where: { id: { in: maladieIds } },
+      select: { id: true, nom: true, groupeEpidemiologique: true },
+    })
     const maladieMap = Object.fromEntries(maladies.map(m => [m.id, m.nom]))
+    const maladieGroupMap = Object.fromEntries(maladies.map(m => [m.id, m.groupeEpidemiologique ?? "autre"]))
 
-    // Resolve commune names
+    // Resolve commune names + wilaya rollup
     const communeIds = casByCommuneRaw.map(r => r.communeId).filter(Boolean) as string[]
-    const communes = await prisma.commune.findMany({ where: { id: { in: communeIds } }, select: { id: true, nom: true } })
+    const communes = await prisma.commune.findMany({
+      where: { id: { in: communeIds } },
+      select: { id: true, nom: true, wilayadId: true },
+    })
     const communeMap = Object.fromEntries(communes.map(c => [c.id, c.nom]))
+
+    // Wilaya distribution
+    const communeCountMap = Object.fromEntries(casByCommuneRaw.map(r => [r.communeId!, r._count._all]))
+    const wilayadCountMap: Record<string, number> = {}
+    for (const c of communes) {
+      if (c.wilayadId) {
+        wilayadCountMap[c.wilayadId] = (wilayadCountMap[c.wilayadId] ?? 0) + (communeCountMap[c.id] ?? 0)
+      }
+    }
+    const wilayadIds = Object.keys(wilayadCountMap)
+    const wilayasRef = await prisma.wilaya.findMany({
+      where: { id: { in: wilayadIds } },
+      select: { id: true, nom: true },
+    })
+    const wilayaNameMap = Object.fromEntries(wilayasRef.map(w => [w.id, w.nom]))
+    const wilayadDistribution = Object.entries(wilayadCountMap)
+      .map(([id, count]) => ({ name: wilayaNameMap[id] ?? "Inconnu", count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+
+    // Category distribution
+    const CAT_ORDER = ["pev", "mth", "zoonose", "ist", "vectorielle", "nosocomiale", "autre"]
+    const CAT_LABELS: Record<string, string> = { pev: "PEV", mth: "MTH", zoonose: "Zoonose", ist: "IST", vectorielle: "Vectorielle", nosocomiale: "Nosocomiale", autre: "Autre" }
+    const catCountMap: Record<string, number> = {}
+    for (const r of casByMaladieRaw) {
+      if (!r.maladieId) continue
+      const cat = maladieGroupMap[r.maladieId] ?? "autre"
+      catCountMap[cat] = (catCountMap[cat] ?? 0) + r._count._all
+    }
+    const categorieDistribution = CAT_ORDER
+      .filter(g => (catCountMap[g] ?? 0) > 0)
+      .map(g => ({ name: CAT_LABELS[g] ?? g, key: g, count: catCountMap[g] ?? 0 }))
+      .sort((a, b) => b.count - a.count)
+
+    // Evolution distribution labels
+    const EVOLUTION_LABELS: Record<string, string> = {
+      guerison: "Guérison", en_cours_guerison: "En cours", sortant: "Sortant",
+      toujours_malade: "Toujours malade", autre: "Autre", deces: "Décès",
+    }
+    const evolutionDistribution = byEvolutionRaw
+      .map(r => ({ name: EVOLUTION_LABELS[r.evolution!] ?? r.evolution!, count: r._count._all }))
+      .sort((a, b) => b.count - a.count)
+
+    // Sex distribution
+    const sexDistribution = bySexRaw.map(r => ({
+      name: r.sex === "homme" ? "Homme" : r.sex === "femme" ? "Femme" : r.sex,
+      count: Number(r.count),
+    }))
 
     const confirmes = statutRaw.find(s => s.statut === "confirme")?._count._all ?? 0
 
@@ -135,15 +240,30 @@ export async function POST(req: Request) {
         tauxConfirmation: totalCas > 0 ? Math.round((confirmes / totalCas) * 100) : 0,
         alertes: totalAlertes,
         investigations: totalInvestigations,
+        hospitalisations: totalHospitalises,
+        tauxHospitalisation: totalCas > 0 ? Math.round((totalHospitalises / totalCas) * 100) : 0,
+        evacuations: totalEvacues,
+        tauxEvacuation: totalCas > 0 ? Math.round((totalEvacues / totalCas) * 100) : 0,
         servicesFiltre: servicesFilter.length ? servicesFilter : null,
+        maladieFiltre: maladieIdFilter,
+        categorieFiltre: categorieGroupeFilter,
         modeleId,
       },
+      visualisations: templateVisualisations,
       casByMaladie: casByMaladieRaw.map(r => ({ maladie: maladieMap[r.maladieId ?? ""] ?? "—", count: r._count._all })),
       casByCommune: casByCommuneRaw.map(r => ({ commune: communeMap[r.communeId ?? ""] ?? "—", count: r._count._all })),
-      casByService: casByServiceRaw.map(r => ({ service: r.service ?? "Non spécifié", count: r._count._all })),
+      casByService: casByServiceRaw
+        .filter(r => r.serviceDeclarant !== null)
+        .slice(0, 7)
+        .map(r => ({ service: r.serviceDeclarant!, count: r._count._all })),
       weeklyTrend: weeklyRaw.map(r => ({ date: r.week, count: Number(r.count) })),
       ageDistribution: ageRaw.map(r => ({ name: r.tranche, count: Number(r.count) })),
       statutDistribution: statutRaw.map(r => ({ name: r.statut, count: r._count._all })),
+      categorieDistribution,
+      evolutionDistribution,
+      sexDistribution,
+      communeDistribution: casByCommuneRaw.slice(0, 10).map(r => ({ name: communeMap[r.communeId ?? ""] ?? "Inconnu", count: r._count._all })),
+      wilayadDistribution,
     }
 
     const months: Record<number, string> = {
@@ -158,7 +278,7 @@ export async function POST(req: Request) {
       ? `Rapport Semestriel — S${dateDebut.getMonth() < 6 ? 1 : 2} ${dateDebut.getFullYear()}`
       : body.type === "annuel"
       ? `Rapport Annuel — ${dateDebut.getFullYear()}`
-      : `Rapport Personnalisé — ${dateDebut.toLocaleDateString("fr-FR")} au ${dateFin.toLocaleDateString("fr-FR")}`
+      : `Rapport Personnalisé — ${formatDate(dateDebut)} au ${formatDate(dateFin)}`
 
     const titreAvecService = servicesFilter.length
       ? `${titre} · ${servicesFilter.join(", ")}`

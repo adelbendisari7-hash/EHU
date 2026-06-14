@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Plus, Edit, Trash2, FileText } from "lucide-react"
+import { formatDate } from "@/utils/format-date"
 
 interface Protocole {
   id: string
@@ -85,7 +86,7 @@ export default function ProtocoesPage() {
                     <span className="text-xs font-mono bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{p.maladie.codeCim10}</span>
                   </td>
                   <td className="px-5 py-3 text-sm text-gray-500">v{p.version}</td>
-                  <td className="px-5 py-3 text-xs text-gray-400">{new Date(p.updatedAt).toLocaleDateString("fr-FR")}</td>
+                  <td className="px-5 py-3 text-xs text-gray-400">{formatDate(p.updatedAt)}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2 justify-end">
                       <Link

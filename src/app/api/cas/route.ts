@@ -15,16 +15,23 @@ export async function GET(req: Request) {
   const maladieId = searchParams.get("maladieId") ?? ""
   const search = searchParams.get("search") ?? ""
   const service = searchParams.get("service") ?? ""
+  const sourceUistiOnly = searchParams.get("sourceUisti") === "true"
 
   const where: Record<string, unknown> = {}
-  if (statut === "brouillon") {
+  if (sourceUistiOnly) {
+    // UISTI sub-group: only unprocessed (brouillon) UISTI cases
+    // Once the agent changes status → suspect/confirme, the case leaves this group and joins the normal list
+    where.sourceUisti = true
     where.statut = "brouillon"
+  } else if (statut === "brouillon") {
+    where.statut = "brouillon"
+    where.sourceUisti = false
   } else if (statut === "confirme") {
     where.statut = "confirme"
   } else if (statut === "suspect") {
     where.statut = { notIn: ["brouillon", "confirme"] }
   } else {
-    // "Tous" — never show brouillons outside their dedicated filter
+    // "Tous" — never show brouillons (regular or UISTI) outside their dedicated filters
     where.statut = { not: "brouillon" }
   }
   if (maladieId) where.maladieId = maladieId
@@ -211,6 +218,7 @@ export async function POST(req: Request) {
         evaluationClinique: data.evaluationClinique ?? null,
         structureHospitalisationId: data.structureHospitalisationId || null,
         serviceHospitalisation: data.serviceHospitalisation || null,
+        typeBmrId: data.typeBmrId || null,
       },
       include: {
         patient: true,
@@ -375,7 +383,7 @@ export async function POST(req: Request) {
         const since = new Date()
         since.setDate(since.getDate() - 30)
         const recentCount = await prisma.casDeclare.count({
-          where: { maladieId: body.maladieId, createdAt: { gte: since } },
+          where: { maladieId: body.maladieId, dateDiagnostic: { gte: since, not: null } },
         })
         const seuil = maladie.seuilDefaut ?? 5
         if (recentCount >= seuil) {

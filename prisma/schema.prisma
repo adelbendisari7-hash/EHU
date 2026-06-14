@@ -286,6 +286,8 @@ model CasDeclare {
   evaluationClinique     Json?    @map("evaluation_clinique")   // Clinical evaluation data
   structureHospitalisationId String? @map("structure_hospitalisation_id")
   serviceHospitalisation String?  @map("service_hospitalisation")
+  typeBmrId              String?  @map("type_bmr_id")
+  sourceUisti            Boolean  @default(false) @map("source_uisti")
 
   patient              Patient            @relation(fields: [patientId], references: [id])
   maladie              Maladie?           @relation(fields: [maladieId], references: [id])
@@ -297,6 +299,7 @@ model CasDeclare {
   casSimilaireRef CasDeclare?  @relation("CasSimilaireLink", fields: [casSimilaireId], references: [id])
   casSimilairesLies CasDeclare[] @relation("CasSimilaireLink")
   structureHospitalisation Etablissement? @relation("HospitalisationEtablissement", fields: [structureHospitalisationId], references: [id])
+  typeBmr              TypeBmr?           @relation(fields: [typeBmrId], references: [id])
   investigation Investigation?
   fichiers      Fichier[]
   declenchements ProtocoleDeclenchement[]
@@ -305,6 +308,19 @@ model CasDeclare {
   resultatsLabo ResultatLabo[]
 
   @@map("cas_declares")
+}
+
+// ─── TypeBmr (reference list — filled progressively by agents) ───────────
+
+model TypeBmr {
+  id         String       @id @default(uuid())
+  nom        String       @unique
+  codeCim10  String?      @map("code_cim10")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  casDeclares CasDeclare[]
+
+  @@map("types_bmr")
 }
 
 // ─── Symptome (reference) ─────────────────────────────────────────────────

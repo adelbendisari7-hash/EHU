@@ -53,7 +53,7 @@ export async function GET(req: Request) {
   if (services.length === 1) where.serviceDeclarant = services[0]
   else if (services.length > 1) where.serviceDeclarant = { in: services }
 
-  // Cases by disease (prevalence)
+  // Cases by disease — used for category distribution
   const byMaladie = await prisma.casDeclare.groupBy({
     by: ["maladieId"],
     where,
@@ -62,19 +62,40 @@ export async function GET(req: Request) {
   })
   const maladieFetchIds = byMaladie.map(r => r.maladieId).filter((id): id is string => Boolean(id))
   const maladies = await prisma.maladie.findMany({ where: { id: { in: maladieFetchIds } } })
-  const maladieMap = Object.fromEntries(maladies.map(m => [m.id, m.nom]))
-  const prevalence = byMaladie.map(r => ({
-    name: r.maladieId ? (maladieMap[r.maladieId] ?? "Inconnu") : "Non renseigné",
-    count: r._count.id,
-  }))
+  const maladieGroupeMap = Object.fromEntries(maladies.map(m => [m.id, m.groupeEpidemiologique ?? "autre"]))
 
-  // Cases by status
-  const byStatut = await prisma.casDeclare.groupBy({
-    by: ["statut"],
+  // Category distribution (groupeEpidemiologique)
+  const CAT_ORDER = ["pev", "mth", "zoonose", "ist", "vectorielle", "nosocomiale", "autre"]
+  const CAT_LABELS: Record<string, string> = { pev: "PEV", mth: "MTH", zoonose: "Zoonose", ist: "IST", vectorielle: "Vectorielle", nosocomiale: "Nosocomiale", autre: "Autre" }
+  const catCountMap: Record<string, number> = {}
+  for (const r of byMaladie) {
+    if (!r.maladieId) continue
+    const cat = maladieGroupeMap[r.maladieId] ?? "autre"
+    catCountMap[cat] = (catCountMap[cat] ?? 0) + r._count.id
+  }
+  const categorieDistribution = CAT_ORDER
+    .filter(g => (catCountMap[g] ?? 0) > 0)
+    .map(g => ({ name: CAT_LABELS[g] ?? g, key: g, count: catCountMap[g] ?? 0 }))
+    .sort((a, b) => b.count - a.count)
+
+  // Evolution distribution
+  const byEvolution = await prisma.casDeclare.groupBy({
+    by: ["evolution"],
     where,
     _count: { id: true },
   })
-  const statutDistribution = byStatut.map(r => ({ name: r.statut, count: r._count.id }))
+  const EVOLUTION_LABELS: Record<string, string> = {
+    guerison: "Guérison",
+    en_cours_guerison: "En cours de guérison",
+    sortant: "Sortant",
+    toujours_malade: "Toujours malade",
+    autre: "Autre",
+    deces: "Décès",
+  }
+  const evolutionDistribution = byEvolution
+    .filter(r => r.evolution !== null)
+    .map(r => ({ name: EVOLUTION_LABELS[r.evolution!] ?? r.evolution!, count: r._count.id }))
+    .sort((a, b) => b.count - a.count)
 
   // Cases with patient data for age/sex breakdown and trend
   const allCas = await prisma.casDeclare.findMany({
@@ -82,6 +103,8 @@ export async function GET(req: Request) {
     select: {
       createdAt: true,
       statut: true,
+      estHospitalise: true,
+      estEvacue: true,
       patient: { select: { dateOfBirth: true, sex: true } },
     },
   })
@@ -106,14 +129,15 @@ export async function GET(req: Request) {
   }))
 
   // Temporal trend (weekly)
+  const parseDate = (s: string, fallback: Date) => { const d = new Date(s); return isNaN(d.getTime()) ? fallback : d }
   const periodDays = dateDebut || dateFin
-    ? Math.max(7, Math.ceil((new Date(dateFin || today).getTime() - new Date(dateDebut || today).getTime()) / (1000 * 60 * 60 * 24)) + 1)
+    ? Math.max(7, Math.ceil((parseDate(dateFin, today).getTime() - parseDate(dateDebut, today).getTime()) / (1000 * 60 * 60 * 24)) + 1)
     : days
   const weeks: Record<string, number> = {}
   for (let i = Math.ceil(periodDays / 7) - 1; i >= 0; i--) {
     const d = new Date()
     d.setDate(d.getDate() - i * 7)
-    const key = `S${d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`
+    const key = `S${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}`
     weeks[key] = 0
   }
   allCas.forEach(c => {
@@ -121,7 +145,7 @@ export async function GET(req: Request) {
     const weekDiff = Math.floor((today.getTime() - d.getTime()) / (7 * 24 * 60 * 60 * 1000))
     const weekDate = new Date()
     weekDate.setDate(weekDate.getDate() - weekDiff * 7)
-    const key = `S${weekDate.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}`
+    const key = `S${String(weekDate.getDate()).padStart(2,"0")}/${String(weekDate.getMonth()+1).padStart(2,"0")}`
     if (key in weeks) weeks[key]++
   })
   const weeklyTrend = Object.entries(weeks).map(([date, count]) => ({ date, count }))
@@ -129,6 +153,8 @@ export async function GET(req: Request) {
   const total = allCas.length
   const confirmes = allCas.filter(c => c.statut === "confirme").length
   const tauxConfirmation = total > 0 ? Math.round((confirmes / total) * 100) : 0
+  const hospitalisations = allCas.filter(c => c.estHospitalise).length
+  const evacuations = allCas.filter(c => c.estEvacue).length
 
   // Commune distribution
   const byCommune = await prisma.casDeclare.groupBy({
@@ -140,7 +166,7 @@ export async function GET(req: Request) {
   const communeFetchIds = byCommune.map(r => r.communeId).filter((id): id is string => Boolean(id))
   const communesRef = await prisma.commune.findMany({
     where: { id: { in: communeFetchIds } },
-    select: { id: true, nom: true },
+    select: { id: true, nom: true, wilayadId: true },
   })
   const communeNameMap = Object.fromEntries(communesRef.map(c => [c.id, c.nom]))
   const communeDistribution = byCommune.slice(0, 10).map(r => ({
@@ -149,16 +175,36 @@ export async function GET(req: Request) {
   }))
   const communesTouchees = communeFetchIds.length
 
+  // Wilaya distribution
+  const communeCountMap = Object.fromEntries(byCommune.map(r => [r.communeId!, r._count.id]))
+  const wilayadCountMap: Record<string, number> = {}
+  for (const c of communesRef) {
+    if (c.wilayadId) {
+      wilayadCountMap[c.wilayadId] = (wilayadCountMap[c.wilayadId] ?? 0) + (communeCountMap[c.id] ?? 0)
+    }
+  }
+  const wilayadIds2 = Object.keys(wilayadCountMap)
+  const wilayasRef = await prisma.wilaya.findMany({
+    where: { id: { in: wilayadIds2 } },
+    select: { id: true, nom: true },
+  })
+  const wilayaNameMap = Object.fromEntries(wilayasRef.map(w => [w.id, w.nom]))
+  const wilayadDistribution = Object.entries(wilayadCountMap)
+    .map(([id, count]) => ({ name: wilayaNameMap[id] ?? "Inconnu", count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+
   // Total maladies in the system
   const totalMaladies = await prisma.maladie.count({ where: { isActive: true } })
 
   return NextResponse.json({
-    prevalence,
-    statutDistribution,
+    categorieDistribution,
+    evolutionDistribution,
     ageDistribution,
     sexDistribution,
     weeklyTrend,
     communeDistribution,
+    wilayadDistribution,
     summary: {
       total,
       confirmes,
@@ -166,6 +212,8 @@ export async function GET(req: Request) {
       maladiesDeclarees: maladieFetchIds.length,
       totalMaladies,
       communesTouchees,
+      hospitalisations,
+      evacuations,
     },
   })
 }

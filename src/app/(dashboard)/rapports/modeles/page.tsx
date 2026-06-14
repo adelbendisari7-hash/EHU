@@ -27,12 +27,18 @@ const SECTION_OPTIONS = [
 ]
 
 const VISUALISATION_OPTIONS = [
-  { value: "histogramme_maladies", label: "Histogramme par maladie" },
-  { value: "courbe_temporelle", label: "Courbe d'évolution hebdomadaire" },
-  { value: "pyramide_ages", label: "Pyramide des âges" },
-  { value: "camembert_statuts", label: "Camembert des statuts cliniques" },
-  { value: "distribution_services", label: "Distribution par service" },
-  { value: "tableau_recapitulatif", label: "Tableau récapitulatif MDO" },
+  { value: "indicateurs_cles", label: "Indicateurs clés (KPI)", group: "Tableau de bord" },
+  { value: "histogramme_maladies", label: "Histogramme par maladie", group: "Tableau de bord" },
+  { value: "courbe_temporelle", label: "Courbe d'évolution hebdomadaire", group: "Tableau de bord" },
+  { value: "pyramide_ages", label: "Pyramide des âges", group: "Tableau de bord" },
+  { value: "camembert_statuts", label: "Camembert des statuts cliniques", group: "Tableau de bord" },
+  { value: "distribution_services", label: "Distribution par service hospitalier", group: "Tableau de bord" },
+  { value: "tableau_recapitulatif", label: "Tableau récapitulatif MDO", group: "Tableau de bord" },
+  { value: "camembert_categories", label: "Répartition par catégorie épidémiologique", group: "Analyses" },
+  { value: "distribution_evolution", label: "Distribution par évolution clinique", group: "Analyses" },
+  { value: "repartition_sexe", label: "Répartition par sexe", group: "Analyses" },
+  { value: "distribution_communes", label: "Top 10 communes touchées", group: "Analyses" },
+  { value: "distribution_wilaya", label: "Distribution par wilaya", group: "Analyses" },
 ]
 
 interface Template {
@@ -54,6 +60,12 @@ export default function RapportModelesPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [form, setForm] = useState({ titre: "", type: "mensuel", description: "", sections: [] as string[], visualisations: [] as string[] })
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (showModal) document.body.style.overflow = "hidden"
+    else document.body.style.overflow = ""
+    return () => { document.body.style.overflow = "" }
+  }, [showModal])
 
   const fetchTemplates = useCallback(async () => {
     setLoading(true)
@@ -207,10 +219,11 @@ export default function RapportModelesPage() {
 
       {/* Create/Edit Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="fixed inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-          <div className="relative flex min-h-full items-start justify-center px-4 pt-20 pb-10">
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 z-10">
+        <>
+          <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowModal(false)} />
+          <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-start justify-center px-4 py-10">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-base font-semibold text-gray-800">{editTemplate ? "Modifier le modèle" : "Nouveau modèle"}</h2>
               <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
@@ -274,25 +287,46 @@ export default function RapportModelesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">Visualisations à inclure</label>
-                <div className="space-y-1.5">
-                  {VISUALISATION_OPTIONS.map(opt => (
-                    <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer group">
-                      <div
-                        onClick={() => toggleVisualisation(opt.value)}
-                        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
-                          form.visualisations.includes(opt.value)
-                            ? "border-blue-600"
-                            : "border-gray-300 group-hover:border-gray-400"
-                        }`}
-                        style={form.visualisations.includes(opt.value) ? { backgroundColor: "#1B4F8A", borderColor: "#1B4F8A" } : {}}
-                      >
-                        {form.visualisations.includes(opt.value) && <Check size={10} className="text-white" />}
-                      </div>
-                      <span className="text-sm text-gray-700">{opt.label}</span>
-                    </label>
-                  ))}
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-medium text-gray-600">Visualisations à inclure</label>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setForm(p => ({
+                        ...p,
+                        visualisations: p.visualisations.length === VISUALISATION_OPTIONS.length
+                          ? []
+                          : VISUALISATION_OPTIONS.map(o => o.value),
+                      }))
+                    }
+                    className="text-xs text-[#1B4F8A] hover:underline"
+                  >
+                    {form.visualisations.length === VISUALISATION_OPTIONS.length ? "Tout désélectionner" : "Tout sélectionner"}
+                  </button>
                 </div>
+                {(["Tableau de bord", "Analyses"] as const).map(grp => (
+                  <div key={grp} className="mb-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">{grp}</p>
+                    <div className="space-y-1.5">
+                      {VISUALISATION_OPTIONS.filter(o => o.group === grp).map(opt => (
+                        <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer group">
+                          <div
+                            onClick={() => toggleVisualisation(opt.value)}
+                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
+                              form.visualisations.includes(opt.value)
+                                ? "border-blue-600"
+                                : "border-gray-300 group-hover:border-gray-400"
+                            }`}
+                            style={form.visualisations.includes(opt.value) ? { backgroundColor: "#1B4F8A", borderColor: "#1B4F8A" } : {}}
+                          >
+                            {form.visualisations.includes(opt.value) && <Check size={10} className="text-white" />}
+                          </div>
+                          <span className="text-sm text-gray-700">{opt.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -311,7 +345,8 @@ export default function RapportModelesPage() {
             </div>
           </div>
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       {/* Delete confirm */}

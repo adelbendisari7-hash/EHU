@@ -1,6 +1,41 @@
 import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcryptjs"
 import { MALADIES_SEED } from "./seeds/maladies"
+
+// Mapping codeCim10 → groupeEpidemiologique (catégories PDF JO 2022)
+const GROUPE_EPID_MAP: Record<string, string> = {
+  // Nosocomiale
+  "U82": "nosocomiale", "Y62": "nosocomiale", "J95": "nosocomiale",
+  "U82.0": "nosocomiale", "U82.1": "nosocomiale", "U82.2": "nosocomiale",
+  "U82.2a": "nosocomiale", "U82.2b": "nosocomiale", "U82.2c": "nosocomiale",
+  "U82.2d": "nosocomiale", "U82.2e": "nosocomiale", "U82.3": "nosocomiale",
+  "U82.4": "nosocomiale", "U82.5": "nosocomiale", "U82.8": "nosocomiale",
+  "U82.8a": "nosocomiale", "U82.9": "nosocomiale", "U83.0": "nosocomiale",
+  "U83.0a": "nosocomiale", "U83.1": "nosocomiale", "U83.1a": "nosocomiale",
+  "U83.8": "nosocomiale", "U83.9": "nosocomiale", "U84.0": "nosocomiale",
+  "U84.1": "nosocomiale", "U84.2": "nosocomiale", "B96.4": "nosocomiale",
+  "B96.9": "nosocomiale",
+  // PEV — Programme Élargi de Vaccination
+  "G000": "pev", "G82": "pev", "A37": "pev", "A36": "pev",
+  "B05": "pev", "B06": "pev", "A33": "pev", "A35": "pev",
+  "A15": "pev", "A18": "pev", "A80": "pev", "B03": "pev",
+  // Autre
+  "G01A39": "autre", "G01": "autre", "G03": "autre", "G05": "autre",
+  "A30": "autre", "J10": "autre", "U04": "autre", "U07": "autre", "U071": "autre",
+  // Vectorielle
+  "B54": "vectorielle", "B551": "vectorielle", "B550": "vectorielle",
+  "A20": "vectorielle", "A77": "vectorielle", "A71": "vectorielle", "A75": "vectorielle",
+  "A92": "vectorielle", "A90": "vectorielle", "A984": "vectorielle",
+  "A95": "vectorielle", "A924": "vectorielle", "A923": "vectorielle", "A988": "vectorielle",
+  // Zoonose
+  "A23": "zoonose", "A22": "zoonose", "B67": "zoonose",
+  "A27": "zoonose", "A32": "zoonose", "A82": "zoonose",
+  // MTH — Maladies à Transmission Hydrique
+  "A05.1": "mth", "A06": "mth", "A01": "mth", "B15": "mth",
+  "A48": "mth", "A00": "mth", "B65": "mth", "A05.9": "mth",
+  // IST — Infections Sexuellement Transmissibles
+  "B16": "ist", "B17": "ist", "A74": "ist", "B24": "ist", "A53": "ist", "A54": "ist",
+}
 import { PERMISSIONS_SEED, ROLES_SEED } from "./seeds/roles-permissions"
 import { COMMUNES_ALL } from "./seeds/communes-all"
 import { GERMES } from "../src/constants/germes"
@@ -25,7 +60,32 @@ const WILAYAS = [
   { code: "40", nom: "Khenchela" }, { code: "41", nom: "Souk Ahras" }, { code: "42", nom: "Tipaza" },
   { code: "43", nom: "Mila" }, { code: "44", nom: "Aïn Defla" }, { code: "45", nom: "Naâma" },
   { code: "46", nom: "Aïn Témouchent" }, { code: "47", nom: "Ghardaïa" }, { code: "48", nom: "Relizane" },
+  // Wilayas 49-58 — réforme administrative algérienne de 2019/2021
+  { code: "49", nom: "Timimoun" },
+  { code: "50", nom: "Bordj Badji Mokhtar" },
+  { code: "51", nom: "Ouled Djellal" },
+  { code: "52", nom: "Béni Abbès" },
+  { code: "53", nom: "In Salah" },
+  { code: "54", nom: "In Guezzam" },
+  { code: "55", nom: "Touggourt" },
+  { code: "56", nom: "Djanet" },
+  { code: "57", nom: "El M'Ghair" },
+  { code: "58", nom: "El Menia" },
 ]
+
+// Chefs-lieux des wilayas 49-58 (pour COMMUNES_ALL non encore disponibles)
+const NEW_WILAYAS_COMMUNES: Record<string, { nom: string; lat?: number; lng?: number }[]> = {
+  "49": [{ nom: "Timimoun", lat: 29.263, lng: 0.230 }, { nom: "Charouine", lat: 29.016, lng: -0.274 }, { nom: "Aougrout", lat: 28.937, lng: 0.432 }],
+  "50": [{ nom: "Bordj Badji Mokhtar", lat: 21.328, lng: 0.948 }, { nom: "Timiaouine", lat: 20.5, lng: 1.5 }],
+  "51": [{ nom: "Ouled Djellal", lat: 34.424, lng: 5.063 }, { nom: "Sidi Khaled", lat: 34.379, lng: 4.981 }, { nom: "Ras El Miaad", lat: 34.5, lng: 5.3 }],
+  "52": [{ nom: "Béni Abbès", lat: 30.129, lng: -2.166 }, { nom: "Kerzaz", lat: 29.458, lng: -1.442 }, { nom: "Beni Ounif", lat: 32.049, lng: -1.243 }],
+  "53": [{ nom: "In Salah", lat: 27.196, lng: 2.463 }, { nom: "In Ghar", lat: 27.943, lng: 2.958 }, { nom: "Foggaret Ezzaouïa", lat: 27.369, lng: 2.883 }],
+  "54": [{ nom: "In Guezzam", lat: 19.563, lng: 5.769 }, { nom: "Tin Zaouatine", lat: 21.143, lng: 2.922 }],
+  "55": [{ nom: "Touggourt", lat: 33.099, lng: 6.060 }, { nom: "Megarine", lat: 33.249, lng: 6.117 }, { nom: "El Hadjira", lat: 32.965, lng: 5.504 }, { nom: "Temacine", lat: 33.055, lng: 6.055 }],
+  "56": [{ nom: "Djanet", lat: 24.555, lng: 9.485 }, { nom: "Illizi", lat: 26.483, lng: 8.483 }],
+  "57": [{ nom: "El M'Ghair", lat: 33.953, lng: 5.928 }, { nom: "Djamaa", lat: 33.534, lng: 5.995 }, { nom: "Sidi Amrane", lat: 33.502, lng: 6.354 }],
+  "58": [{ nom: "El Menia", lat: 30.584, lng: 2.880 }, { nom: "Hassi Gara", lat: 29.972, lng: 3.488 }],
+}
 
 
 async function main() {
@@ -66,6 +126,24 @@ async function main() {
   }
   console.log(`  ✓ ${totalCommunes} communes ajoutées`)
 
+  // Communes des nouvelles wilayas 49-58 (non présentes dans COMMUNES_ALL)
+  console.log("Seeding communes des wilayas 49-58...")
+  let newWilayaCommunes = 0
+  for (const [code, communes] of Object.entries(NEW_WILAYAS_COMMUNES)) {
+    const wilayadId = wilayas[code]
+    if (!wilayadId) continue
+    for (const c of communes) {
+      const existing = await prisma.commune.findFirst({ where: { nom: c.nom, wilayadId } })
+      if (!existing) {
+        await prisma.commune.create({
+          data: { nom: c.nom, wilayadId, latitude: c.lat ?? null, longitude: c.lng ?? null },
+        })
+        newWilayaCommunes++
+      }
+    }
+  }
+  console.log(`  ✓ ${newWilayaCommunes} communes (wilayas 49-58) ajoutées`)
+
   // Symptômes
   console.log("Seeding symptômes...")
   for (const s of SYMPTOMS) {
@@ -82,8 +160,8 @@ async function main() {
   for (const g of GERMES) {
     await prisma.germe.upsert({
       where: { nom: g.nom },
-      update: { code: g.code, type: g.type },
-      create: { code: g.code, nom: g.nom, type: g.type },
+      update: { code: g.code, type: g.type, isActive: true },
+      create: { code: g.code, nom: g.nom, type: g.type, isActive: true },
     })
   }
   console.log(`  ✓ ${GERMES.length} germes`)
@@ -97,16 +175,20 @@ async function main() {
         nom: m.nom, categorie: m.categorie, nomCourt: m.nomCourt,
         seuilDefaut: m.seuilDefaut, categorieGravite: m.categorieGravite,
         delaiNotificationHeures: m.delaiNotificationHeures,
+        periodeDefautJours: (m as { periodeDefautJours?: number }).periodeDefautJours ?? null,
         hasFicheSpecifique: m.hasFicheSpecifique,
         ficheSpecifiqueSlug: (m as { ficheSpecifiqueSlug?: string }).ficheSpecifiqueSlug ?? null,
+        groupeEpidemiologique: GROUPE_EPID_MAP[m.codeCim10] ?? null,
       },
       create: {
         nom: m.nom, codeCim10: m.codeCim10, categorie: m.categorie,
         nomCourt: m.nomCourt ?? null, seuilDefaut: m.seuilDefaut ?? null,
         categorieGravite: m.categorieGravite ?? null,
         delaiNotificationHeures: m.delaiNotificationHeures ?? null,
+        periodeDefautJours: (m as { periodeDefautJours?: number }).periodeDefautJours ?? null,
         hasFicheSpecifique: m.hasFicheSpecifique,
         ficheSpecifiqueSlug: (m as { ficheSpecifiqueSlug?: string }).ficheSpecifiqueSlug ?? null,
+        groupeEpidemiologique: GROUPE_EPID_MAP[m.codeCim10] ?? null,
         isActive: true,
       },
     })

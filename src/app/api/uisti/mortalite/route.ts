@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 import { writeAudit, getIp } from "@/lib/audit"
+import { formatDate } from "@/utils/format-date"
+import { generatePatientId, generateCodeCas } from "@/utils/generate-id"
 
 // GET /api/uisti/mortalite
 // Section 2 — Croisement MDO → Mortalité hospitalière
@@ -78,10 +80,10 @@ export async function GET(req: Request) {
       statut: c.statut,
     },
     hospitalisation: {
-      dateAdmission: c.dateHospitalisation ? new Date(c.dateHospitalisation).toLocaleDateString("fr-FR") : null,
+      dateAdmission: formatDate(c.dateHospitalisation),
       service: c.serviceDeclarant ?? c.service ?? "—",
     },
-    dateDeces: c.dateDeces ? new Date(c.dateDeces).toLocaleDateString("fr-FR") : null,
+    dateDeces: formatDate(c.dateDeces),
     commune: c.commune?.nom ?? "—",
   }))
 
@@ -148,9 +150,25 @@ export async function GET(req: Request) {
   })
 }
 
+// Map service name → numeric code for generateCodeCas
+const SERVICES_EHU_CODES: Record<string, number> = {
+  "MPR": 1, "Cardiologie": 2, "Médecine interne": 3, "Hépato-gastro-entérologie": 4,
+  "Nephrologie-hémodialyse": 5, "Dermatologie": 6, "Pneumologie": 7, "Hématologie": 8,
+  "Oncologie": 9, "Endocrinologie": 10, "Neurologie médicale": 11, "Médecine de travail": 12,
+  "Médecine légale": 13, "Chirurgie Hépato-biliaire": 14, "Neurochirurgie": 15,
+  "Chirurgie générale": 16, "Chirurgie urologique": 17, "Chirurgie traumatologique et orthopédique": 18,
+  "Chirurgie thoracique": 19, "Chirurgie vasculaire": 20, "Chirurgie cardiaque": 21,
+  "Chirurgie maxillo-faciale": 22, "ORL": 23, "Gynécologie obstétrique": 24,
+  "Réanimation médicale": 25, "Réanimation chirurgicale": 26, "Réanimation pédiatrique": 27,
+  "UMC": 28, "USIC": 29, "Réa-UMC": 30,
+  "Bactériologie": 31, "Biochimie": 32, "Immunologie": 33, "Médecine nucléaire": 34,
+  "Cytogénétique": 35, "Hémobiologie": 36, "Pharmacologie": 37, "Anapath": 38,
+  "Toxicologie": 39, "Neurophysiologie": 40, "CTS": 41, "Imagerie": 42,
+}
+
 // POST /api/uisti/mortalite
 // Cas 2 — UISTI signale un décès lié à une MDO non encore déclarée
-// → Crée une alerte vers l'unité de surveillance épidémiologique
+// → Crée une déclaration pré-remplie (brouillon) + une alerte épidémiologique
 export async function POST(req: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
@@ -160,49 +178,107 @@ export async function POST(req: Request) {
 
   try {
     const body = await req.json()
-    const { nomPatient, prenomPatient, dateDeces, maladieSuspectee, maladieId, communeId, details } = body
+    const {
+      nomPatient, prenomPatient, dateDeces, maladieSuspectee,
+      maladieId, service, wilaya, dateAdmission, details,
+    } = body
 
-    if (!nomPatient || !dateDeces || !maladieSuspectee) {
+    if (!nomPatient || !dateDeces || (!maladieId && !maladieSuspectee)) {
       return NextResponse.json({
-        error: "Les champs nomPatient, dateDeces et maladieSuspectee sont obligatoires",
+        error: "Les champs nomPatient, dateDeces et la pathologie MDO sont obligatoires",
       }, { status: 400 })
     }
 
+    // Resolve maladie: prefer explicit maladieId, fallback to name search
+    const maladieFound = maladieId
+      ? await prisma.maladie.findUnique({ where: { id: maladieId }, select: { id: true, nom: true, codeCim10: true } })
+      : maladieSuspectee
+        ? await prisma.maladie.findFirst({ where: { nom: { contains: maladieSuspectee.trim(), mode: "insensitive" } }, select: { id: true, nom: true, codeCim10: true } })
+        : null
+    const nomMaladie = maladieFound?.nom ?? maladieSuspectee ?? "—"
+
+    // Create a minimal Patient record (epid agent will complete it later)
+    const patient = await prisma.patient.create({
+      data: {
+        identifiant:  generatePatientId(),
+        firstName:    prenomPatient?.trim() || "—",
+        lastName:     nomPatient.trim(),
+        dateOfBirth:  new Date("1900-01-01"), // placeholder — à compléter par l'agent
+        sex:          "homme",                 // placeholder — à compléter
+        address:      wilaya ? `Wilaya : ${wilaya}` : "—",
+      },
+    })
+
+    const now = new Date()
+    const svcCode = service ? String(SERVICES_EHU_CODES[service] ?? "00") : "00"
+    const codeCas = await generateCodeCas(now.getFullYear(), svcCode, maladieFound?.codeCim10, prisma)
+
+    // Create the pre-filled CasDeclare (brouillon) for the epid service to complete
+    const cas = await prisma.casDeclare.create({
+      data: {
+        codeCas,
+        patientId:           patient.id,
+        maladieId:           maladieFound?.id ?? null,
+        statut:              "brouillon",
+        evolution:           "deces",
+        dateDeces:           new Date(dateDeces),
+        serviceDeclarant:    service || null,
+        dateHospitalisation: dateAdmission ? new Date(dateAdmission) : null,
+        sourceUisti:         true,
+        moisDeclaration:     now.getMonth() + 1,
+        anneeDeclaration:    now.getFullYear(),
+        donneesSpecifiques: {
+          sourceUisti:      true,
+          maladieSuspectee: nomMaladie,
+          wilaya:           wilaya || null,
+          signalePar:       "Unité UISTI",
+          details:          details || null,
+        },
+      },
+    })
+
+    // Also create the alert for the epid service
     const alerte = await prisma.alerte.create({
       data: {
-        type: "epidemique",
-        titre: `[UISTI] Décès lié à MDO non déclarée — ${maladieSuspectee}`,
+        type:      "epidemique",
+        titre:     `[UISTI] Décès lié à MDO non déclarée — ${nomMaladie}`,
         description: [
-          `Décès signalé par l'unité UISTI nécessitant une déclaration MDO rétrospective.`,
+          `Décès signalé par l'unité UISTI. Déclaration pré-remplie créée : ${codeCas}.`,
           `Patient : ${prenomPatient ?? ""} ${nomPatient}`,
-          `Date du décès : ${new Date(dateDeces).toLocaleDateString("fr-FR")}`,
-          `Pathologie suspectée : ${maladieSuspectee}`,
-          details ? `Détails : ${details}` : "",
+          `Date du décès : ${formatDate(dateDeces)}`,
+          `Pathologie : ${nomMaladie}`,
+          service       ? `Service : ${service}`                    : "",
+          wilaya        ? `Wilaya de résidence : ${wilaya}`          : "",
+          dateAdmission ? `Date d'admission : ${formatDate(dateAdmission)}` : "",
+          details       ? `Détails : ${details}`                    : "",
         ].filter(Boolean).join("\n"),
-        maladieId: maladieId ?? null,
-        communeId: communeId ?? null,
-        nombreCas: 1,
-        statut: "active",
-        createdBy: session.user.id,
+        maladieId:  maladieFound?.id ?? null,
+        nombreCas:  1,
+        statut:     "active",
+        createdBy:  session.user.id,
         recommandations: {
-          action: "Déclaration MDO rétrospective requise",
-          urgence: "haute",
+          action:     "Compléter la déclaration MDO rétrospective",
+          urgence:    "haute",
           signalePar: "Unité UISTI",
+          casId:      cas.id,
+          codeCas,
         },
       },
     })
 
     await writeAudit({
-      userId: session.user.id,
-      action: "CREATE",
-      entity: "Alerte",
-      entityId: alerte.id,
-      details: { source: "UISTI", type: "deces_mdo_non_declare", maladieSuspectee },
-      ip: getIp(req),
+      userId:   session.user.id,
+      action:   "CREATE",
+      entity:   "CasDeclare",
+      entityId: cas.id,
+      details:  { source: "UISTI", type: "deces_mdo_non_declare", maladie: nomMaladie, alerteId: alerte.id },
+      ip:       getIp(req),
     })
 
     return NextResponse.json({
-      message: "Alerte créée. L'unité de surveillance épidémiologique a été notifiée.",
+      message:  "Déclaration pré-remplie créée et alerte envoyée au service épidémiologique.",
+      casId:    cas.id,
+      codeCas,
       alerteId: alerte.id,
     }, { status: 201 })
   } catch (err) {

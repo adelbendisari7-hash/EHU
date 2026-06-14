@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
+import { formatDate } from "@/utils/format-date"
 
 // GET /api/uisti/patients
 // Section 1 — Morbidité hospitalière : données MDO partagées avec l'unité UISTI
@@ -80,7 +81,7 @@ export async function GET(req: Request) {
         identifiant: c.patient.identifiant,
         nom: c.patient.lastName,
         prenom: c.patient.firstName,
-        dateNaissance: dob.toLocaleDateString("fr-FR"),
+        dateNaissance: formatDate(dob),
         age: ageAns,
         sexe: c.patient.sex,
         communeResidence: c.patient.commune?.nom ?? c.commune?.nom ?? "—",
@@ -90,16 +91,16 @@ export async function GET(req: Request) {
         maladie: c.maladie?.nom ?? "—",
         codeCim10: c.maladie?.codeCim10 ?? "—",
         categorie: c.maladie?.categorie ?? "—",
-        dateDiagnostic: c.dateDiagnostic ? new Date(c.dateDiagnostic).toLocaleDateString("fr-FR") : null,
+        dateDiagnostic: formatDate(c.dateDiagnostic),
         statut: c.statut,
       },
       hospitalisation: {
-        dateAdmission: c.dateHospitalisation ? new Date(c.dateHospitalisation).toLocaleDateString("fr-FR") : null,
+        dateAdmission: formatDate(c.dateHospitalisation),
         service,
       },
       evolution: c.evolution ?? null,
-      dateDeces: c.dateDeces ? new Date(c.dateDeces).toLocaleDateString("fr-FR") : null,
-      dateDeclaration: new Date(c.createdAt).toLocaleDateString("fr-FR"),
+      dateDeces: formatDate(c.dateDeces),
+      dateDeclaration: formatDate(c.createdAt),
     }
   })
 

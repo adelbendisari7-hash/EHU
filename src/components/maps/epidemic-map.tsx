@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useRef } from "react"
+import { formatDate } from "@/utils/format-date"
 
 interface Marker {
   id: string
@@ -206,7 +207,7 @@ export default function EpidemicMap({ markers, wilayaStats, selectedWilayadIds, 
           <div style="font-size:12px;min-width:150px">
             <strong style="color:#1B4F8A">${marker.maladie}</strong><br/>
             <span style="color:#666">${marker.commune}</span><br/>
-            <span style="color:#999">${new Date(marker.date).toLocaleDateString("fr-FR")}</span>
+            <span style="color:#999">${formatDate(marker.date)}</span>
           </div>
         `)
         dot.addTo(map)

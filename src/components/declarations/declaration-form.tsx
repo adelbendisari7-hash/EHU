@@ -1,6 +1,7 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, useCallback } from "react"
+import { createPortal } from "react-dom"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -19,6 +20,8 @@ import { SYMPTOM_CATEGORIES } from "@/constants/symptoms"
 import { SAMPLE_TYPES } from "@/constants/sample-types"
 import { LIEU_TYPES } from "@/constants/lieu-types"
 import { ANTECEDENTS_PREDEFINED } from "@/constants/antecedents"
+import { SERVICES_EHU } from "@/constants/services"
+import DateInput from "@/components/shared/date-input"
 
 // ---------------------------------------------------------------------------
 // Zod Schema
@@ -37,10 +40,10 @@ function optInt() {
 }
 
 const declarationSchema = z.object({
-  // Header — médecin déclarant
+  // Header — médecin déclarant optionnel, service obligatoire
   medecinDeclarantId: z.string().optional(),
-  nomMedecinDeclarant: z.string().min(2, "Nom du médecin requis"),
-  prenomMedecinDeclarant: z.string().min(2, "Prénom du médecin requis"),
+  nomMedecinDeclarant: z.string().optional(),
+  prenomMedecinDeclarant: z.string().optional(),
   serviceDeclarant: z.string().min(1, "Service déclarant requis"),
   // kept for DB compat but not shown in UI
   moisDeclaration: optInt(),
@@ -72,8 +75,10 @@ const declarationSchema = z.object({
   dateDebutSymptomes: z.string().optional(),
   dateDiagnostic: z.string().optional(),
   asymptomatique: z.boolean().optional(),
-  observation: z.enum(["cas_confirme", "cas_suspect"]).optional(),
-  modeConfirmation: z.enum(["clinique", "biologique", "epidemiologique"]).optional(),
+  observation: z.enum(["cas_confirme", "cas_suspect"], {
+    error: "L'observation est obligatoire (cas confirmé ou cas suspect)",
+  }),
+  modeConfirmation: z.enum(["clinique", "biologique", "epidemiologique"]).optional().catch(undefined),
   atcd: z.string().optional(),
   casSimilaire: z.boolean().optional(),
   nombreCasSimilaires: optInt(),
@@ -88,7 +93,9 @@ const declarationSchema = z.object({
   structureEvacuation: z.string().optional(),
 
   // Evolution
-  evolution: z.enum(["guerison", "en_cours_guerison", "sortant", "toujours_malade", "autre", "deces"]).optional(),
+  evolution: z.enum(["guerison", "en_cours_guerison", "sortant", "toujours_malade", "autre", "deces"], {
+    error: "L'évolution du cas est obligatoire",
+  }),
   dateSortie: z.string().optional(),
   dateDeces: z.string().optional(),
 
@@ -96,6 +103,76 @@ const declarationSchema = z.object({
   service: z.string().optional(),
   notesCliniques: z.string().optional(),
   resultatLabo: z.string().optional(),
+  typeBmrId: z.string().optional(),
+})
+
+// ---------------------------------------------------------------------------
+// Cross-field date integrity constraints — used as the form resolver
+// (brouillonSchema keeps using declarationSchema.partial() — no strict checks there)
+// ---------------------------------------------------------------------------
+function pd(s: string | undefined | null): Date | null {
+  if (!s) return null
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? null : d
+}
+
+const declarationSchemaFull = declarationSchema.superRefine((data, ctx) => {
+  const today = new Date()
+  today.setHours(23, 59, 59, 999)
+  const MIN_DATE = new Date("1900-01-01")
+
+  const dob   = pd(data.dateOfBirth)
+  const dds   = pd(data.dateDebutSymptomes)
+  const ddx   = pd(data.dateDiagnostic)
+  const dhosp = pd(data.dateHospitalisation)
+  const devac = pd(data.dateEvacuation)
+  const dsort = pd(data.dateSortie)
+  const ddec  = pd(data.dateDeces)
+  const ddecl = pd(data.dateDeclaration)
+
+  // ── Groupe 1 — Aucune date dans le futur ─────────────────────────────────
+  if (dob   && dob   > today) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateOfBirth"],          message: "La date de naissance ne peut pas être dans le futur" })
+  if (dds   && dds   > today) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDebutSymptomes"],   message: "La date de début des symptômes ne peut pas être dans le futur" })
+  if (ddx   && ddx   > today) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDiagnostic"],       message: "La date de diagnostic ne peut pas être dans le futur" })
+  if (dhosp && dhosp > today) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateHospitalisation"],  message: "La date d'hospitalisation ne peut pas être dans le futur" })
+  if (devac && devac > today) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateEvacuation"],       message: "La date d'évacuation ne peut pas être dans le futur" })
+  if (dsort && dsort > today) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateSortie"],           message: "La date de sortie ne peut pas être dans le futur" })
+  if (ddec  && ddec  > today) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDeces"],            message: "La date de décès ne peut pas être dans le futur" })
+  if (ddecl && ddecl > today) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDeclaration"],      message: "La date de déclaration ne peut pas être dans le futur" })
+
+  // ── Groupe 2 — Cohérence avec la date de naissance ───────────────────────
+  if (dob && dob < MIN_DATE)            ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateOfBirth"],         message: "La date de naissance ne peut pas être antérieure à 1900" })
+  if (dob && dds   && dds   < dob)      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDebutSymptomes"],  message: "La date de début des symptômes ne peut pas être avant la naissance du patient" })
+  if (dob && ddx   && ddx   < dob)      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDiagnostic"],      message: "La date de diagnostic ne peut pas être avant la naissance du patient" })
+  if (dob && dhosp && dhosp < dob)      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateHospitalisation"], message: "La date d'hospitalisation ne peut pas être avant la naissance du patient" })
+  if (dob && dsort && dsort < dob)      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateSortie"],          message: "La date de sortie ne peut pas être avant la naissance du patient" })
+  if (dob && ddec  && ddec  < dob)      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDeces"],           message: "La date de décès ne peut pas être avant la naissance du patient" })
+  if (dob && devac && devac < dob)      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateEvacuation"],      message: "La date d'évacuation ne peut pas être avant la naissance du patient" })
+
+  // ── Groupe 3 — Séquence clinique (contraintes dures) ─────────────────────
+  if (!data.asymptomatique && dds && ddx && ddx < dds)
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDiagnostic"],      message: "La date de diagnostic ne peut pas précéder le début des symptômes" })
+  if (dhosp && dsort && dsort < dhosp)
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateSortie"],          message: "La date de sortie doit être postérieure à la date d'hospitalisation" })
+  if (dhosp && ddec  && ddec  < dhosp)
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDeces"],           message: "La date de décès ne peut pas être avant la date d'hospitalisation" })
+  if (dds   && ddec  && ddec  < dds)
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDeces"],           message: "La date de décès ne peut pas être avant le début des symptômes" })
+  if (dhosp && devac && devac < dhosp)
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateEvacuation"],      message: "La date d'évacuation doit être postérieure à la date d'hospitalisation" })
+
+  // ── Groupe 5 — Cohérence logique ─────────────────────────────────────────
+  if (data.evolution !== "deces" && ddec)
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDeces"],           message: "Date de décès saisie alors que l'évolution sélectionnée n'est pas « décès »" })
+  if (dsort && ddec) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateSortie"],          message: "Impossible de renseigner à la fois une date de sortie et une date de décès" })
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateDeces"],           message: "Impossible de renseigner à la fois une date de sortie et une date de décès" })
+  }
+  if (!data.estHospitalise) {
+    if (dhosp) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateHospitalisation"], message: "Date d'hospitalisation saisie alors que le patient n'est pas marqué comme hospitalisé" })
+    if (dsort) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateSortie"],          message: "Date de sortie saisie alors que le patient n'est pas marqué comme hospitalisé" })
+    if (devac) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["dateEvacuation"],      message: "Date d'évacuation saisie alors que le patient n'est pas marqué comme hospitalisé" })
+  }
 })
 
 // Brouillon schema — only the bare minimum
@@ -128,9 +205,13 @@ interface Maladie {
 }
 
 interface GroupedMaladies {
-  categorie_1_mdo: Maladie[]
-  categorie_2_epidemique: Maladie[]
-  categorie_3_bmr: Maladie[]
+  pev: Maladie[]
+  mth: Maladie[]
+  zoonose: Maladie[]
+  ist: Maladie[]
+  vectorielle: Maladie[]
+  nosocomiale: Maladie[]
+  autre: Maladie[]
 }
 
 interface Wilaya { id: string; nom: string; code: string }
@@ -298,37 +379,130 @@ function SearchableSelect({
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState("")
+  const [activeIdx, setActiveIdx] = useState(-1)
   const [dropStyle, setDropStyle] = useState<React.CSSProperties>({})
   const btnRef = useRef<HTMLButtonElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
 
   const filtered = options.filter(o =>
     stripAccents(o.label.toLowerCase()).includes(stripAccents(search.toLowerCase()))
   )
   const selected = options.find(o => o.value === value)
 
-  const openDropdown = () => {
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect()
-      const estimatedH = Math.min(filtered.length * 36 + 60, 260)
-      const spaceBelow = window.innerHeight - r.bottom
-      const style: React.CSSProperties = { position: "fixed", left: r.left, width: r.width, zIndex: 9999 }
-      if (spaceBelow < estimatedH && r.top > spaceBelow) {
-        style.bottom = window.innerHeight - r.top + 4
-      } else {
-        style.top = r.bottom + 4
-      }
-      setDropStyle(style)
+  const calcStyle = useCallback(() => {
+    if (!btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - r.bottom - 8
+    const spaceAbove = r.top - 8
+    const maxH = 260
+    if (spaceBelow >= 120 || spaceBelow >= spaceAbove) {
+      setDropStyle({ position: "fixed", top: r.bottom + 4, left: r.left, width: r.width, maxHeight: Math.min(maxH, Math.max(spaceBelow, 120)), zIndex: 9999 })
+    } else {
+      setDropStyle({ position: "fixed", top: r.top - Math.min(maxH, spaceAbove) - 4, left: r.left, width: r.width, maxHeight: Math.min(maxH, spaceAbove), zIndex: 9999 })
     }
-    setOpen(v => !v)
-    if (open) setSearch("")
+  }, [])
+
+  const open_ = () => { calcStyle(); setOpen(true) }
+  const close = () => { setOpen(false); setSearch(""); setActiveIdx(-1) }
+  const pick = (val: string) => { onChange(val); close() }
+
+  // Focus search input after dropdown renders (no autoFocus to avoid scroll-to-element)
+  useEffect(() => { if (open) inputRef.current?.focus() }, [open])
+
+  // Reposition on scroll or resize while open
+  useEffect(() => {
+    if (!open) return
+    window.addEventListener("scroll", calcStyle, true)
+    window.addEventListener("resize", calcStyle)
+    return () => {
+      window.removeEventListener("scroll", calcStyle, true)
+      window.removeEventListener("resize", calcStyle)
+    }
+  }, [open, calcStyle])
+
+  useEffect(() => { setActiveIdx(-1) }, [search])
+
+  useEffect(() => {
+    if (activeIdx >= 0 && listRef.current) {
+      const el = listRef.current.children[activeIdx] as HTMLElement | undefined
+      el?.scrollIntoView({ block: "nearest" })
+    }
+  }, [activeIdx])
+
+  const onKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, filtered.length - 1)) }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)) }
+    else if (e.key === "Enter") { e.preventDefault(); if (activeIdx >= 0 && filtered[activeIdx]) pick(filtered[activeIdx].value) }
+    else if (e.key === "Escape") { e.preventDefault(); close(); btnRef.current?.focus() }
   }
+
+  const onBtnKey = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") { e.preventDefault(); if (!open) open_() }
+    else if (e.key === "Escape") close()
+  }
+
+  const dropdown = open ? createPortal(
+    <>
+      <div style={{ position: "fixed", inset: 0, zIndex: 9998 }} onClick={close} />
+      <div
+        style={{ ...dropStyle, overflow: "hidden", display: "flex", flexDirection: "column", background: "white", border: "1px solid #e5e7eb", borderRadius: "8px", boxShadow: "0 10px 25px -5px rgba(0,0,0,.12),0 4px 10px -5px rgba(0,0,0,.08)" }}
+      >
+        <div style={{ padding: "8px", borderBottom: "1px solid #f3f4f6", flexShrink: 0 }}>
+          <div style={{ position: "relative" }}>
+            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: "#9ca3af" }} />
+            <input
+              ref={inputRef}
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              onKeyDown={onKey}
+              placeholder="Rechercher..."
+              className="input w-full text-sm"
+              style={{ paddingLeft: 32 }}
+            />
+          </div>
+        </div>
+        <div ref={listRef} style={{ overflowY: "auto", flex: 1 }} role="listbox">
+          {filtered.length === 0 ? (
+            <p style={{ padding: "12px", fontSize: "14px", color: "#9ca3af", textAlign: "center" }}>Aucun résultat</p>
+          ) : (
+            filtered.map((opt, idx) => (
+              <button
+                key={opt.value}
+                type="button"
+                role="option"
+                aria-selected={value === opt.value}
+                onMouseDown={e => { e.preventDefault(); pick(opt.value) }}
+                style={{
+                  display: "block", width: "100%", textAlign: "left",
+                  padding: "8px 12px", fontSize: "14px", cursor: "pointer",
+                  background: value === opt.value ? "#eff6ff" : activeIdx === idx ? "#f3f4f6" : "white",
+                  color: value === opt.value ? "#1d4ed8" : "#111827",
+                  fontWeight: value === opt.value ? 500 : 400,
+                  borderBottom: "1px solid #f9fafb",
+                }}
+                onMouseEnter={() => setActiveIdx(idx)}
+              >
+                {opt.label}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </>,
+    document.body
+  ) : null
 
   return (
     <div className="relative">
       <button
         ref={btnRef}
         type="button"
-        onClick={openDropdown}
+        onClick={() => open ? close() : open_()}
+        onKeyDown={onBtnKey}
+        aria-haspopup="listbox"
+        aria-expanded={open}
         className="input w-full text-left flex items-center justify-between"
       >
         <span className={selected ? "text-gray-900 truncate pr-2" : "text-gray-400 truncate pr-2"}>
@@ -336,43 +510,7 @@ function SearchableSelect({
         </span>
         <ChevronDown size={14} className="text-gray-400 shrink-0" />
       </button>
-      {open && (
-        <div style={dropStyle} className="bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-hidden flex flex-col">
-          <div className="p-2 border-b border-gray-100 shrink-0">
-            <div className="relative">
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Rechercher..."
-                className="input w-full pl-8 text-sm"
-                autoFocus
-              />
-            </div>
-          </div>
-          <div className="overflow-y-auto max-h-48">
-            {filtered.length === 0 ? (
-              <p className="p-3 text-sm text-gray-400 text-center">Aucun résultat</p>
-            ) : (
-              filtered.map(opt => (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => { onChange(opt.value); setOpen(false); setSearch("") }}
-                  className={cn(
-                    "w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors",
-                    value === opt.value && "bg-blue-50 text-blue-700 font-medium"
-                  )}
-                >
-                  {opt.label}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-      {open && <div className="fixed inset-0" style={{ zIndex: 9998 }} onClick={() => { setOpen(false); setSearch("") }} />}
+      {dropdown}
     </div>
   )
 }
@@ -387,9 +525,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
   // Data state
   const [maladies, setMaladies] = useState<Maladie[]>([])
   const [groupedMaladies, setGroupedMaladies] = useState<GroupedMaladies>({
-    categorie_1_mdo: [],
-    categorie_2_epidemique: [],
-    categorie_3_bmr: [],
+    pev: [], mth: [], zoonose: [], ist: [], vectorielle: [], nosocomiale: [], autre: [],
   })
   const [wilayas, setWilayas] = useState<Wilaya[]>([])
   const [allCommunes, setAllCommunes] = useState<Commune[]>([])
@@ -407,6 +543,8 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [declenchement, setDeclenchement] = useState<any>(null)
   const [ficheSpecifiqueSlug, setFicheSpecifiqueSlug] = useState<string | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [ficheInitData, setFicheInitData] = useState<Record<string, any> | null>(null)
 
   // Feature state
   const [selectedSymptomeIds, setSelectedSymptomeIds] = useState<string[]>([])
@@ -423,6 +561,13 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
   const [newGermeNom, setNewGermeNom] = useState("")
   const [newGermeCode, setNewGermeCode] = useState("")
   const [newGermeLoading, setNewGermeLoading] = useState(false)
+
+  // BMR type state
+  const [bmrTypes, setBmrTypes] = useState<{ id: string; nom: string; codeCim10: string | null }[]>([])
+  const [bmrTypeCreating, setBmrTypeCreating] = useState(false)
+  const [bmrTypeSearch, setBmrTypeSearch] = useState("")
+  const [bmrTypeDropOpen, setBmrTypeDropOpen] = useState(false)
+  const [bmrNewCodCim10, setBmrNewCodCim10] = useState("")
 
   // ATCD multi-select state
   const [atcdList, setAtcdList] = useState<string[]>([...ANTECEDENTS_PREDEFINED])
@@ -456,7 +601,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     reset,
     formState: { errors },
   } = useForm<DeclarationFormData>({
-    resolver: zodResolver(declarationSchema),
+    resolver: zodResolver(declarationSchemaFull),
     defaultValues: {
       estEtranger: false,
       casSimilaire: false,
@@ -479,6 +624,8 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
   const observation = watch("observation")
   const casSimilaire = watch("casSimilaire")
   const asymptomatique = watch("asymptomatique")
+  const typeBmrId = watch("typeBmrId")
+  const isBmr = !!maladies.find(m => m.id === maladieId && (m.nomCourt === "BMR" || m.codeCim10 === "U82"))
 
   // ---------------------------------------------------------------------------
   // Effects
@@ -550,6 +697,16 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     return () => clearTimeout(timer)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstName, lastName, dateOfBirth, isEditMode])
+
+  // Fetch BMR types whenever a BMR disease is selected
+  useEffect(() => {
+    if (!isBmr) return
+    fetch("/api/bmr-types")
+      .then(r => r.json())
+      .then(setBmrTypes)
+      .catch(console.error)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBmr])
 
   // Load reference data — create mode only
   useEffect(() => {
@@ -640,12 +797,14 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
         setFilteredCommunes(communesData.filter((c: any) => c.wilayadId === resolvedWilayadId || c.wilaya?.id === resolvedWilayadId))
       }
 
-      // Pre-fill form with case data
+      // Pre-fill form — fiche incluse pour que les champs lisent les valeurs dès le montage
       reset({
         medecinDeclarantId: md?.id ?? "",
         nomMedecinDeclarant: md?.nom ?? "",
         prenomMedecinDeclarant: md?.prenom ?? "",
         serviceDeclarant: caseData.serviceDeclarant ?? "",
+        dateDeclaration: toDateStr(caseData.createdAt),
+        ...(caseData.donneesSpecifiques ? { fiche: caseData.donneesSpecifiques } : {}),
         firstName: p?.firstName ?? "",
         lastName: p?.lastName ?? "",
         nin: caseData.nin ?? "",
@@ -685,6 +844,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
         notesCliniques: caseData.notesCliniques ?? "",
         resultatLabo: caseData.resultatLabo ?? "",
         etablissementId: caseData.etablissementId ?? "",
+        typeBmrId: caseData.typeBmrId ?? undefined,
       })
 
       // Pre-fill symptomes
@@ -723,9 +883,22 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
         })))
       }
 
-      // Pre-fill ficheSpecifique
+      // Activer la fiche spécifique et stocker ses données initiales
       if (caseData.ficheSpecifiqueType) {
         setFicheSpecifiqueSlug(caseData.ficheSpecifiqueType)
+        if (caseData.donneesSpecifiques) {
+          setFicheInitData(caseData.donneesSpecifiques)
+        }
+      }
+
+      // Pre-fill pièces jointes — TOUS les fichiers attachés au cas
+      if (Array.isArray(caseData.fichiers) && caseData.fichiers.length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        setDeclarationFiles(caseData.fichiers.map((f: any) => ({
+          id: f.id,
+          name: f.filename || f.url?.split("/").pop() || "Fichier",
+          url: f.url,
+        })))
       }
 
       setInitialLoading(false)
@@ -809,6 +982,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     evolution: data.evolution || null,
     dateSortie: data.dateSortie || null,
     dateDeces: data.dateDeces || null,
+    typeBmrId: data.typeBmrId || null,
     serviceDeclarant: data.serviceDeclarant || null,
     moisDeclaration: data.moisDeclaration ?? null,
     anneeDeclaration: data.anneeDeclaration ?? null,
@@ -817,7 +991,9 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     notesCliniques: data.notesCliniques || null,
     resultatLabo: data.resultatLabo || null,
     ficheSpecifiqueType: ficheSpecifiqueSlug || null,
-    donneesSpecifiques: ficheSpecifiqueSlug ? (data as Record<string, unknown>).fiche ?? null : null,
+    // getValues("fiche") lit directement dans le store RHF, sans passer par zodResolver
+    // qui supprime les champs non déclarés dans le schéma Zod.
+    donneesSpecifiques: ficheSpecifiqueSlug ? (getValues("fiche") ?? null) : null,
     nationaliteCode: data.nationaliteCode || null,
     structureHospitalisationId: data.structureHospitalisationId || null,
     serviceHospitalisation: data.serviceHospitalisation || null,
@@ -837,11 +1013,74 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     setLoading(true)
     setError(null)
     try {
+      // ── Avertissements non-bloquants (groupe 3 soft + groupe 5 warning) ──
+      const _dds  = pd(data.dateDebutSymptomes)
+      const _dhosp = pd(data.dateHospitalisation)
+      if (_dds && _dhosp && _dhosp < _dds)
+        toast.warning("Date d'hospitalisation antérieure au début des symptômes")
+      if (data.evolution === "deces" && !data.dateDeces)
+        toast.warning("L'évolution indique un décès mais la date de décès n'est pas renseignée")
+
+      // ── Validation des dates de prélèvement (résultats labo) ─────────────
+      const _today = new Date(); _today.setHours(23, 59, 59, 999)
+      const _dob = pd(data.dateOfBirth)
+      let laboValid = true
+      for (let i = 0; i < resultatsLabo.length; i++) {
+        const r = resultatsLabo[i]
+        if (!r.datePrelevement) continue
+        const dp = new Date(r.datePrelevement)
+        if (dp > _today) {
+          toast.error(`Prélèvement ${i + 1} : la date de prélèvement ne peut pas être dans le futur`)
+          laboValid = false
+        }
+        if (_dob && dp < _dob) {
+          toast.error(`Prélèvement ${i + 1} : la date de prélèvement ne peut pas être avant la naissance du patient`)
+          laboValid = false
+        }
+        if (_dds && dp < _dds)
+          toast.warning(`Prélèvement ${i + 1} : date de prélèvement antérieure au début des symptômes`)
+      }
+      if (!laboValid) { setLoading(false); return }
+
+      // ── Validation BMR : type obligatoire si maladie BMR sélectionnée ──────
+      const selectedMaladie = maladies.find(m => m.id === data.maladieId)
+      const isBmr = selectedMaladie?.nomCourt === "BMR" || selectedMaladie?.codeCim10 === "U82"
+      if (isBmr && !data.typeBmrId) {
+        setError("Le type de BMR est obligatoire pour cette maladie")
+        setLoading(false)
+        return
+      }
+
       let statut = "suspect"
       if (data.observation === "cas_confirme") statut = "confirme"
       else if (data.observation === "cas_suspect") statut = "suspect"
 
       const payload = buildPayload(data, statut)
+
+      // Fonction commune d'upload de fichiers
+      const uploadPendingFiles = async (targetCasId: string) => {
+        const newFiles: { file: File; type: string }[] = [
+          ...declarationFiles.filter(f => f.file).map(f => ({ file: f.file!, type: "declaration" })),
+          ...resultatsLabo.flatMap(r =>
+            (r.files ?? []).filter(f => f.file).map(f => ({ file: f.file!, type: "resultat_labo" }))
+          ),
+        ]
+        if (newFiles.length === 0) return
+        const results = await Promise.allSettled(newFiles.map(({ file, type }) => {
+          const fd = new FormData()
+          fd.append("file", file)
+          fd.append("casId", targetCasId)
+          fd.append("type", type)
+          return fetch("/api/upload", { method: "POST", body: fd }).then(r => {
+            if (!r.ok) throw new Error(`Upload échoué: ${r.status}`)
+            return r.json()
+          })
+        }))
+        const failed = results.filter(r => r.status === "rejected")
+        if (failed.length > 0) {
+          console.warn(`${failed.length} fichier(s) non uploadé(s)`)
+        }
+      }
 
       if (isEditMode) {
         const res = await fetch(`/api/cas/${casId}`, {
@@ -853,6 +1092,8 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
           const err = await res.json()
           throw new Error(err.error ?? "Erreur lors de la mise à jour")
         }
+        // Uploader les nouveaux fichiers ajoutés en mode édition
+        await uploadPendingFiles(casId!)
         toast.success("Déclaration mise à jour")
         router.push(`/declarations/${casId}`)
       } else {
@@ -866,24 +1107,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
           throw new Error(err.error ?? "Erreur lors de la déclaration")
         }
         const cas = await res.json()
-
-        // Upload declaration proof files
-        const allPendingFiles: { file: File; type: string }[] = [
-          ...declarationFiles.filter(f => f.file).map(f => ({ file: f.file!, type: "declaration" })),
-          ...resultatsLabo.flatMap(r =>
-            r.files.filter(f => f.file).map(f => ({ file: f.file!, type: "resultat_labo" }))
-          ),
-        ]
-        if (allPendingFiles.length > 0) {
-          await Promise.allSettled(allPendingFiles.map(({ file, type }) => {
-            const fd = new FormData()
-            fd.append("file", file)
-            fd.append("casId", cas.id)
-            fd.append("type", type)
-            return fetch("/api/upload", { method: "POST", body: fd })
-          }))
-        }
-
+        await uploadPendingFiles(cas.id)
         toast.success("Déclaration enregistrée avec succès")
         autoSaveRef.current = true
         if (cas.declenchement) {
@@ -1146,18 +1370,11 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     </div>
   )
 
-  const relevantSymptomCategories = selectedMaladie
-    ? getRelevantSymptomCategories(selectedMaladie.nom, selectedMaladie.codeCim10)
-    : []
-
+  // Toutes les catégories de symptômes — sans filtre par maladie
   const symptomesByCategory = SYMPTOM_CATEGORIES.map(cat => ({
     ...cat,
     items: symptomes.filter(s => s.categorie === cat.key),
-  })).filter(g => {
-    if (g.items.length === 0) return false
-    if (relevantSymptomCategories.length === 0) return true
-    return relevantSymptomCategories.includes(g.key)
-  })
+  })).filter(g => g.items.length > 0)
 
   // ---------------------------------------------------------------------------
   // Loading spinner (edit mode while fetching case data)
@@ -1253,16 +1470,17 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">Date de naissance</label>
-                  <input
-                    {...register("dateOfBirth")}
-                    type="date"
-                    className={inputCls(false)}
-                    onChange={e => {
+                  <DateInput
+                    name="dateOfBirth"
+                    watch={watch}
+                    setValue={setValue}
+                    className={inputCls(!!errors.dateOfBirth)}
+                    onAfterChange={() => {
                       dobChangedByUser.current = true
                       ageChangedByUser.current = false
-                      register("dateOfBirth").onChange(e)
                     }}
                   />
+                  <FieldError msg={errors.dateOfBirth?.message} />
                 </div>
                 <div>
                   <label className="label">Âge</label>
@@ -1436,7 +1654,8 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
               <>
                 <div>
                   <label className="label">Date d&apos;hospitalisation</label>
-                  <input {...register("dateHospitalisation")} type="date" className={inputCls(false)} />
+                  <DateInput name="dateHospitalisation" watch={watch} setValue={setValue} className={inputCls(!!errors.dateHospitalisation)} />
+                  <FieldError msg={errors.dateHospitalisation?.message} />
                 </div>
                 <div>
                   <label className="label">Structure d&apos;hospitalisation</label>
@@ -1447,11 +1666,12 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
                 </div>
                 <div>
                   <label className="label">Service d&apos;hospitalisation</label>
-                  <input
-                    {...register("serviceHospitalisation")}
-                    className={inputCls(false)}
-                    placeholder="Ex: Réanimation, Médecine interne..."
-                  />
+                  <select {...register("serviceHospitalisation")} className={inputCls(false)}>
+                    <option value="">Sélectionner un service...</option>
+                    {SERVICES_EHU.map(s => (
+                      <option key={s.code} value={s.nom}>{s.nom}</option>
+                    ))}
+                  </select>
                 </div>
               </>
             )}
@@ -1466,7 +1686,8 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
               <>
                 <div>
                   <label className="label">Date d&apos;évacuation</label>
-                  <input {...register("dateEvacuation")} type="date" className={inputCls(false)} />
+                  <DateInput name="dateEvacuation" watch={watch} setValue={setValue} className={inputCls(!!errors.dateEvacuation)} />
+                  <FieldError msg={errors.dateEvacuation?.message} />
                 </div>
                 <div>
                   <label className="label">Structure d&apos;évacuation</label>
@@ -1477,7 +1698,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
 
             {/* Évolution */}
             <div className="col-span-2">
-              <label className="label">Évolution</label>
+              <label className="label">Évolution <span className="text-red-500">*</span></label>
               <div className="grid grid-cols-3 gap-2">
                 {([
                   { value: "guerison", label: "Guérison" },
@@ -1495,7 +1716,9 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
                         ? opt.value === "deces"
                           ? "border-red-400 bg-red-50 text-red-700 font-medium"
                           : "border-[#1B4F8A] bg-[#EBF1FA] text-[#1B4F8A] font-medium"
-                        : "border-gray-200 text-gray-600 hover:border-gray-300"
+                        : errors.evolution && !evolution
+                          ? "border-red-300 text-gray-600 hover:border-red-400"
+                          : "border-gray-200 text-gray-600 hover:border-gray-300"
                     )}
                   >
                     <input type="radio" value={opt.value} {...register("evolution")} className="sr-only" />
@@ -1503,18 +1726,21 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
                   </label>
                 ))}
               </div>
+              <FieldError msg={errors.evolution?.message} />
 
               {(evolution === "guerison" || evolution === "sortant") && (
                 <div className="mt-3">
                   <label className="label">Date de sortie</label>
-                  <input {...register("dateSortie")} type="date" className={inputCls(false)} />
+                  <DateInput name="dateSortie" watch={watch} setValue={setValue} className={inputCls(!!errors.dateSortie)} />
+                  <FieldError msg={errors.dateSortie?.message} />
                 </div>
               )}
 
               {evolution === "deces" && (
                 <div className="mt-3">
                   <label className="label">Date du décès <span className="text-red-500">*</span></label>
-                  <input {...register("dateDeces")} type="date" className={inputCls(false)} />
+                  <DateInput name="dateDeces" watch={watch} setValue={setValue} className={inputCls(!!errors.dateDeces)} />
+                  <FieldError msg={errors.dateDeces?.message} />
                 </div>
               )}
             </div>
@@ -1544,22 +1770,173 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
               />
             </div>
 
+            {/* Type BMR — affiché uniquement si la maladie sélectionnée est BMR */}
+            {isBmr && (() => {
+              const selected = bmrTypes.find(t => t.id === typeBmrId)
+              const q = stripAccents(bmrTypeSearch.trim().toLowerCase())
+              const filtered = q
+                ? bmrTypes.filter(t =>
+                    stripAccents(t.nom.toLowerCase()).includes(q) ||
+                    (t.codeCim10 && stripAccents(t.codeCim10.toLowerCase()).includes(q))
+                  )
+                : bmrTypes
+              const exactMatch = bmrTypes.some(
+                t => t.nom.toLowerCase() === bmrTypeSearch.trim().toLowerCase() ||
+                     (t.codeCim10 && t.codeCim10.toLowerCase() === bmrTypeSearch.trim().toLowerCase())
+              )
+              const showCreate = bmrTypeSearch.trim().length > 0 && !exactMatch
+              return (
+                <div className="col-span-2">
+                  <label className="label">Type de BMR <span className="text-red-500">*</span></label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => { setBmrTypeDropOpen(o => !o); setBmrNewCodCim10("") }}
+                      className={cn(
+                        "input w-full text-left flex items-center justify-between",
+                        !selected ? "text-gray-400" : "text-gray-900"
+                      )}
+                    >
+                      <span className="truncate pr-2">
+                        {selected
+                          ? selected.codeCim10
+                            ? `${selected.nom} (${selected.codeCim10})`
+                            : selected.nom
+                          : "Sélectionner ou créer un type de BMR"}
+                      </span>
+                      <ChevronDown size={14} className="text-gray-400 shrink-0" />
+                    </button>
+                    {bmrTypeDropOpen && (
+                      <>
+                        <div
+                          style={{ position: "fixed", inset: 0, zIndex: 40 }}
+                          onClick={() => { setBmrTypeDropOpen(false); setBmrTypeSearch(""); setBmrNewCodCim10("") }}
+                        />
+                        <div
+                          style={{ position: "absolute", top: "100%", left: 0, right: 0, marginTop: 4, zIndex: 50 }}
+                          className="bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden"
+                        >
+                          {/* Search */}
+                          <div className="p-2 border-b border-gray-100">
+                            <input
+                              autoFocus
+                              type="text"
+                              value={bmrTypeSearch}
+                              onChange={e => setBmrTypeSearch(e.target.value)}
+                              onKeyDown={e => { if (e.key === "Escape") { setBmrTypeDropOpen(false); setBmrTypeSearch(""); setBmrNewCodCim10("") } }}
+                              placeholder="Rechercher par nom ou code CIM-10…"
+                              className="input w-full text-sm"
+                            />
+                          </div>
+
+                          {/* List */}
+                          <div className="max-h-48 overflow-y-auto">
+                            {filtered.map(t => (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onMouseDown={e => {
+                                  e.preventDefault()
+                                  setValue("typeBmrId", t.id)
+                                  setBmrTypeDropOpen(false)
+                                  setBmrTypeSearch("")
+                                  setBmrNewCodCim10("")
+                                }}
+                                className={cn(
+                                  "block w-full text-left px-3 py-2 text-sm",
+                                  typeBmrId === t.id ? "bg-blue-50 text-blue-700 font-medium" : "text-gray-900 hover:bg-gray-50"
+                                )}
+                              >
+                                <span className="font-medium">{t.nom}</span>
+                                {t.codeCim10 && (
+                                  <span className="ml-2 text-xs text-gray-400 font-normal">{t.codeCim10}</span>
+                                )}
+                              </button>
+                            ))}
+                            {filtered.length === 0 && !showCreate && (
+                              <p className="px-3 py-4 text-sm text-gray-400 text-center">
+                                Aucun type trouvé — saisissez un nom pour en créer un
+                              </p>
+                            )}
+                          </div>
+
+                          {/* Inline creation form */}
+                          {showCreate && (
+                            <div className="border-t border-gray-100 p-3 bg-gray-50 space-y-2">
+                              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Créer un nouveau type</p>
+                              <div className="flex gap-2">
+                                <div className="flex-1">
+                                  <label className="block text-[10px] text-gray-400 mb-0.5">Nom *</label>
+                                  <input
+                                    type="text"
+                                    value={bmrTypeSearch}
+                                    onChange={e => setBmrTypeSearch(e.target.value)}
+                                    placeholder="Ex: E. coli BLSE"
+                                    className="input w-full text-sm"
+                                  />
+                                </div>
+                                <div className="w-28">
+                                  <label className="block text-[10px] text-gray-400 mb-0.5">Code CIM-10</label>
+                                  <input
+                                    type="text"
+                                    value={bmrNewCodCim10}
+                                    onChange={e => setBmrNewCodCim10(e.target.value.toUpperCase())}
+                                    placeholder="Ex: U82"
+                                    className="input w-full text-sm"
+                                    maxLength={20}
+                                  />
+                                </div>
+                              </div>
+                              <button
+                                type="button"
+                                disabled={bmrTypeCreating || !bmrTypeSearch.trim()}
+                                onMouseDown={async e => {
+                                  e.preventDefault()
+                                  setBmrTypeCreating(true)
+                                  try {
+                                    const res = await fetch("/api/bmr-types", {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        nom: bmrTypeSearch.trim(),
+                                        codeCim10: bmrNewCodCim10.trim() || undefined,
+                                      }),
+                                    })
+                                    if (res.ok) {
+                                      const newType: { id: string; nom: string; codeCim10: string | null } = await res.json()
+                                      setBmrTypes(prev => [...prev.filter(t => t.id !== newType.id), newType].sort((a, b) => a.nom.localeCompare(b.nom)))
+                                      setValue("typeBmrId", newType.id)
+                                      setBmrTypeDropOpen(false)
+                                      setBmrTypeSearch("")
+                                      setBmrNewCodCim10("")
+                                    }
+                                  } catch { /* silent */ } finally { setBmrTypeCreating(false) }
+                                }}
+                                className="w-full py-1.5 text-sm text-white rounded-lg font-medium disabled:opacity-50 transition-colors"
+                                style={{ backgroundColor: "#1B4F8A" }}
+                              >
+                                {bmrTypeCreating ? "Création en cours…" : "Créer ce type"}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
+
             {/* Dates — not required */}
             <div>
               <label className="label">Date d&apos;apparition des symptômes</label>
-              <input
-                {...register("dateDebutSymptomes")}
-                type="date"
-                className={inputCls(false)}
-              />
+              <DateInput name="dateDebutSymptomes" watch={watch} setValue={setValue} className={inputCls(!!errors.dateDebutSymptomes)} />
+              <FieldError msg={errors.dateDebutSymptomes?.message} />
             </div>
             <div>
               <label className="label">Date du diagnostic</label>
-              <input
-                {...register("dateDiagnostic")}
-                type="date"
-                className={inputCls(false)}
-              />
+              <DateInput name="dateDiagnostic" watch={watch} setValue={setValue} className={inputCls(!!errors.dateDiagnostic)} />
+              <FieldError msg={errors.dateDiagnostic?.message} />
             </div>
 
             {/* Asymptomatique */}
@@ -1586,14 +1963,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
             {/* Symptômes codés */}
             {!asymptomatique && (
               <div className="col-span-2">
-                <label className="label">
-                  Symptômes codés
-                  {relevantSymptomCategories.length > 0 && (
-                    <span className="ml-2 text-[11px] text-blue-500 font-normal">
-                      (filtrés pour {selectedMaladie?.nomCourt ?? selectedMaladie?.nom})
-                    </span>
-                  )}
-                </label>
+                <label className="label">Symptômes codés</label>
                 {selectedSymptomeIds.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mb-3">
                     {selectedSymptomeIds.map(id => {
@@ -1677,7 +2047,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
             {/* Observation — drives statut */}
             <div className="col-span-2">
               <label className="label">
-                Observation
+                Observation <span className="text-red-500">*</span>
                 <span className="ml-2 text-[11px] text-gray-400 font-normal">(détermine le statut du cas)</span>
               </label>
               <div className="flex gap-4">
@@ -1693,7 +2063,9 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
                         "flex flex-col items-center gap-1 px-4 py-2.5 rounded-lg border cursor-pointer transition-all flex-1 justify-center text-sm",
                         obsValue === opt.value
                           ? "border-[#1B4F8A] bg-[#EBF1FA] text-[#1B4F8A] font-medium"
-                          : "border-gray-200 text-gray-600 hover:border-gray-300"
+                          : errors.observation
+                            ? "border-red-300 text-gray-600 hover:border-red-400"
+                            : "border-gray-200 text-gray-600 hover:border-gray-300"
                       )}
                     >
                       <input type="radio" value={opt.value} {...register("observation")} className="sr-only" />
@@ -1705,6 +2077,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
                   )
                 })}
               </div>
+              <FieldError msg={errors.observation?.message} />
             </div>
 
             {/* Mode de confirmation */}
@@ -1869,11 +2242,11 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
                   </div>
                   <div>
                     <label className="label">Date début fréquentation</label>
-                    <input type="date" value={lieu.dateDebut} onChange={e => updateLieu(idx, "dateDebut", e.target.value)} className={inputCls(false)} />
+                    <DateInput value={lieu.dateDebut} onChange={v => updateLieu(idx, "dateDebut", v)} className={inputCls(false)} />
                   </div>
                   <div>
                     <label className="label">Date fin fréquentation</label>
-                    <input type="date" value={lieu.dateFin} onChange={e => updateLieu(idx, "dateFin", e.target.value)} className={inputCls(false)} />
+                    <DateInput value={lieu.dateFin} onChange={v => updateLieu(idx, "dateFin", v)} className={inputCls(false)} />
                   </div>
                 </div>
               </div>
@@ -1892,7 +2265,9 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
         <div className="card">
           <SectionHeader letter="5" title="Prélèvements & Résultats Laboratoire" />
           <div className="p-5 space-y-4">
-            <p className="text-xs text-gray-500">Ajoutez un ou plusieurs prélèvements avec leurs résultats et germes identifiés.</p>
+            <p className="text-xs text-gray-500">
+              Renseignez les prélèvements et germes identifiés. Utilisez le bouton ci-dessous pour ajouter des entrées supplémentaires.
+            </p>
 
             {resultatsLabo.map((r, idx) => (
               <div key={idx} className="p-4 border border-gray-200 rounded-lg bg-gray-50/50 space-y-3">
@@ -1914,7 +2289,7 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
                   </div>
                   <div>
                     <label className="label">Date du prélèvement</label>
-                    <input type="date" value={r.datePrelevement} onChange={e => updateResultatLabo(idx, "datePrelevement", e.target.value)} className={inputCls(false)} />
+                    <DateInput value={r.datePrelevement} onChange={v => updateResultatLabo(idx, "datePrelevement", v)} className={inputCls(false)} />
                   </div>
                   <div>
                     <label className="label">Germe identifié</label>
@@ -1922,8 +2297,11 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
                       options={germes.map(g => ({ value: g.id, label: g.code ? `${g.code} — ${g.nom}` : g.nom }))}
                       value={r.germeId}
                       onChange={val => updateResultatLabo(idx, "germeId", val)}
-                      placeholder="Rechercher par nom ou code CIM-10..."
+                      placeholder={germes.length === 0 ? "Chargement des germes..." : "Rechercher par nom ou code CIM-10..."}
                     />
+                    {germes.length === 0 && (
+                      <p className="text-[11px] text-amber-600 mt-1">La liste des germes est vide. Veuillez exécuter le seeder : <code>npm run db:seed</code></p>
+                    )}
                   </div>
                   <div>
                     <label className="label">Résultat</label>
@@ -2021,12 +2399,16 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
         {/* ── Section 7 — Fiche spécifique (conditionnelle) ─────────── */}
         {ficheSpecifiqueSlug && (
           <FicheDynamiqueRenderer
+            key={ficheInitData ? `${ficheSpecifiqueSlug}-ready` : ficheSpecifiqueSlug ?? ""}
             slug={ficheSpecifiqueSlug}
             register={register}
             watch={watch}
             setValue={setValue}
+            getValues={getValues}
+            reset={reset}
             errors={errors}
             control={control}
+            ficheData={ficheInitData}
           />
         )}
 

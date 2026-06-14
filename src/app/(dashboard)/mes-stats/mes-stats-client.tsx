@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts"
 import { FileText, TrendingUp, Calendar, Activity } from "lucide-react"
+import { formatDate } from "@/utils/format-date"
 
 const STATUT_COLORS: Record<string, string> = {
   nouveau: "#6B7280",
@@ -146,7 +147,7 @@ export default function MesStatsClient({ stats }: { stats: Stats }) {
                   }`}>
                     {STATUT_LABELS[c.statut] ?? c.statut}
                   </span>
-                  <p className="text-[11px] text-gray-400 mt-1">{c.createdAt}</p>
+                  <p className="text-[11px] text-gray-400 mt-1">{formatDate(c.createdAt)}</p>
                 </div>
               </Link>
             ))}

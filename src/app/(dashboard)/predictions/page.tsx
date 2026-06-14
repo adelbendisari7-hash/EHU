@@ -6,7 +6,7 @@ export default async function PredictionsPage() {
   const session = await auth()
 
   const [maladies, communes, wilayas] = await Promise.all([
-    prisma.maladie.findMany({ where: { isActive: true }, orderBy: { nom: "asc" }, select: { id: true, nom: true } }),
+    prisma.maladie.findMany({ where: { isActive: true, categorie: { not: "categorie_3_bmr" } }, orderBy: { nom: "asc" }, select: { id: true, nom: true, groupeEpidemiologique: true } }),
     prisma.commune.findMany({ orderBy: { nom: "asc" }, select: { id: true, nom: true, wilayadId: true } }),
     prisma.wilaya.findMany({ orderBy: { nom: "asc" }, select: { id: true, nom: true, code: true } }),
   ])

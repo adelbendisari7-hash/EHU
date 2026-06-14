@@ -7,27 +7,42 @@ interface Maladie {
   nom: string
   codeCim10: string
   categorie: string
+  groupeEpidemiologique?: string | null
   nomCourt?: string | null
   hasFicheSpecifique: boolean
   ficheSpecifiqueSlug?: string | null
 }
 
 interface GroupedMaladies {
-  categorie_1_mdo: Maladie[]
-  categorie_2_epidemique: Maladie[]
-  categorie_3_bmr: Maladie[]
+  pev: Maladie[]
+  mth: Maladie[]
+  zoonose: Maladie[]
+  ist: Maladie[]
+  vectorielle: Maladie[]
+  nosocomiale: Maladie[]
+  autre: Maladie[]
 }
 
+const GROUPES_ORDER: (keyof GroupedMaladies)[] = ["pev", "mth", "zoonose", "ist", "vectorielle", "nosocomiale", "autre"]
+
 const CATEGORY_LABELS: Record<string, string> = {
-  categorie_1_mdo: "Cat. 1 — Maladies à Déclaration Obligatoire",
-  categorie_2_epidemique: "Cat. 2 — Potentiel Épidémique",
-  categorie_3_bmr: "Cat. 3 — Agents BMR",
+  pev:         "PEV — Programme Élargi de Vaccination",
+  mth:         "MTH — Maladies à Transmission Hydrique",
+  zoonose:     "Zoonose — Transmises de l'animal à l'homme",
+  ist:         "IST — Infections Sexuellement Transmissibles",
+  vectorielle: "Vectorielle — Transmises par un vecteur",
+  nosocomiale: "Nosocomiale — Infections associées aux soins",
+  autre:       "Autre — Autres maladies à déclaration obligatoire",
 }
 
 const CATEGORY_COLORS: Record<string, { text: string; bg: string }> = {
-  categorie_1_mdo: { text: "#1B4F8A", bg: "#EBF1FA" },
-  categorie_2_epidemique: { text: "#D97706", bg: "#FFFBEB" },
-  categorie_3_bmr: { text: "#7C3AED", bg: "#F5F0FF" },
+  pev:         { text: "#7C3AED", bg: "#F5F0FF" },
+  mth:         { text: "#2563EB", bg: "#EFF6FF" },
+  zoonose:     { text: "#D97706", bg: "#FFFBEB" },
+  ist:         { text: "#DC2626", bg: "#FEF2F2" },
+  vectorielle: { text: "#EA580C", bg: "#FFF7ED" },
+  nosocomiale: { text: "#059669", bg: "#ECFDF5" },
+  autre:       { text: "#6B7280", bg: "#F9FAFB" },
 }
 
 interface DiseaseComboboxProps {
@@ -42,11 +57,7 @@ export default function DiseaseCombobox({ grouped, value, onChange, error }: Dis
   const [search, setSearch] = useState("")
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const allMaladies = useMemo(() => [
-    ...grouped.categorie_1_mdo,
-    ...grouped.categorie_2_epidemique,
-    ...grouped.categorie_3_bmr,
-  ], [grouped])
+  const allMaladies = useMemo(() => GROUPES_ORDER.flatMap(g => grouped[g] ?? []), [grouped])
 
   const selected = allMaladies.find((m) => m.id === value)
 
@@ -55,11 +66,7 @@ export default function DiseaseCombobox({ grouped, value, onChange, error }: Dis
     const q = search.toLowerCase()
     const filter = (list: Maladie[]) =>
       list.filter((m) => m.nom.toLowerCase().includes(q) || m.codeCim10.toLowerCase().includes(q))
-    return {
-      categorie_1_mdo: filter(grouped.categorie_1_mdo),
-      categorie_2_epidemique: filter(grouped.categorie_2_epidemique),
-      categorie_3_bmr: filter(grouped.categorie_3_bmr),
-    }
+    return Object.fromEntries(GROUPES_ORDER.map(g => [g, filter(grouped[g] ?? [])])) as GroupedMaladies
   }, [search, grouped])
 
   useEffect(() => {
@@ -128,7 +135,8 @@ export default function DiseaseCombobox({ grouped, value, onChange, error }: Dis
             {!hasResults && (
               <p className="text-[13px] text-gray-400 text-center py-6">Aucune maladie trouvée</p>
             )}
-            {(Object.entries(filtered) as [string, Maladie[]][]).map(([cat, list]) => {
+            {GROUPES_ORDER.map((cat) => {
+              const list = filtered[cat] ?? []
               if (list.length === 0) return null
               const colors = CATEGORY_COLORS[cat]
               return (

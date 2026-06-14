@@ -4,6 +4,7 @@ import { UseFormRegister, FieldErrors, UseFormSetValue, UseFormWatch } from "rea
 import { SERVICES_EHU } from "@/constants/services"
 import { Search, ChevronDown, UserPlus } from "lucide-react"
 import { cn } from "@/utils/cn"
+import DateInput from "@/components/shared/date-input"
 
 interface MedecinDeclarant {
   id: string
@@ -76,11 +77,28 @@ export default function FormHeaderSection({
   const createPrenom = queryParts[0] ?? ""
   const createNom = queryParts.slice(1).join(" ") || ""
 
-  const createMedecin = () => {
+  const createMedecin = (prenom?: string, nom?: string) => {
     setValue("medecinDeclarantId", "")
-    setValue("prenomMedecinDeclarant", createPrenom)
-    setValue("nomMedecinDeclarant", createNom)
+    setValue("prenomMedecinDeclarant", prenom ?? createPrenom, { shouldValidate: true })
+    setValue("nomMedecinDeclarant", nom ?? createNom, { shouldValidate: true })
     setOpen(false)
+  }
+
+  // Auto-create when user leaves the search field without clicking a suggestion
+  const handleSearchBlur = () => {
+    // Snapshot values at blur time to avoid stale-closure in the setTimeout
+    const parts = query.trim().split(/\s+/)
+    const hasName = parts.length >= 2 && parts[0].length >= 1 && parts[1].length >= 1
+    // Small delay so clicks on suggestion buttons can fire first
+    setTimeout(() => {
+      const currentNom: string = watch("nomMedecinDeclarant") ?? ""
+      if (!currentNom && hasName) {
+        setValue("medecinDeclarantId", "")
+        setValue("prenomMedecinDeclarant", parts[0], { shouldValidate: true })
+        setValue("nomMedecinDeclarant", parts.slice(1).join(" "), { shouldValidate: true })
+        setOpen(false)
+      }
+    }, 200)
   }
 
   const clearSelection = () => {
@@ -111,12 +129,13 @@ export default function FormHeaderSection({
   const isDoctorConfirmed = !!(medecinIdVal || (nomVal.length >= 2 && prenomVal.length >= 2))
   const isNewDoctor = !medecinIdVal && isDoctorConfirmed
 
-  const hasErrors = errors.nomMedecinDeclarant || errors.prenomMedecinDeclarant || errors.serviceDeclarant
+  const hasErrors = !!errors.serviceDeclarant
 
   // Sync query display when form is pre-filled (edit mode)
   useEffect(() => {
-    if (prenomVal && nomVal && !query) {
-      setQuery(`${prenomVal} ${nomVal}`)
+    if (prenomVal && nomVal) {
+      const expected = `${prenomVal} ${nomVal}`
+      setQuery(prev => (prev === expected || prev.trim() !== "") ? prev : expected)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prenomVal, nomVal])
@@ -136,7 +155,7 @@ export default function FormHeaderSection({
           {/* ── Médecin déclarant ──────────────────────────────────────── */}
           <div className="md:col-span-2">
             <label className="label">
-              Médecin déclarant <span className="text-red-500">*</span>
+              Médecin déclarant
             </label>
 
             {/* Hidden inputs — hold values for form validation & submission */}
@@ -174,7 +193,8 @@ export default function FormHeaderSection({
                     value={query}
                     onChange={e => { setQuery(e.target.value); openSearchDropdown() }}
                     onFocus={() => { loadMedecins(); openSearchDropdown() }}
-                    placeholder="Rechercher le médecin déclarant..."
+                    onBlur={handleSearchBlur}
+                    placeholder="Saisir prénom et nom (ex: Ahmed Benali)..."
                     className={cn("input w-full pl-9", hasErrors && "input-error")}
                   />
                 </div>
@@ -201,7 +221,7 @@ export default function FormHeaderSection({
                     {canCreate && (
                       <button
                         type="button"
-                        onClick={createMedecin}
+                        onClick={() => createMedecin()}
                         className="w-full text-left px-3 py-2.5 bg-blue-50 hover:bg-blue-100 border-t border-blue-100"
                       >
                         <div className="flex items-center gap-2">
@@ -278,7 +298,7 @@ export default function FormHeaderSection({
                           key={s.code}
                           type="button"
                           onClick={() => {
-                            setValue("serviceDeclarant", s.nom)
+                            setValue("serviceDeclarant", s.nom, { shouldValidate: true })
                             setServiceOpen(false)
                             setServiceSearch("")
                           }}
@@ -304,7 +324,7 @@ export default function FormHeaderSection({
           {/* ── Date de déclaration ─────────────────────────────────────── */}
           <div>
             <label className="label">Date de déclaration</label>
-            <input {...register("dateDeclaration")} type="date" className="input w-full" />
+            <DateInput name="dateDeclaration" watch={watch} setValue={setValue} className="input w-full" />
           </div>
 
         </div>

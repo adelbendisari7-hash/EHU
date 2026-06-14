@@ -1,8 +1,115 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
-import { AlertTriangle, Skull, TrendingDown, Plus, RefreshCw, ChevronDown, ChevronUp, Send } from "lucide-react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { AlertTriangle, Skull, TrendingDown, Plus, RefreshCw, ChevronDown, ChevronUp, Send, Search } from "lucide-react"
 import { toast } from "sonner"
+import { SERVICES_EHU } from "@/constants/services"
+
+const WILAYAS = [
+  { code: "01", nom: "Adrar" }, { code: "02", nom: "Chlef" }, { code: "03", nom: "Laghouat" },
+  { code: "04", nom: "Oum El Bouaghi" }, { code: "05", nom: "Batna" }, { code: "06", nom: "Béjaïa" },
+  { code: "07", nom: "Biskra" }, { code: "08", nom: "Béchar" }, { code: "09", nom: "Blida" },
+  { code: "10", nom: "Bouira" }, { code: "11", nom: "Tamanrasset" }, { code: "12", nom: "Tébessa" },
+  { code: "13", nom: "Tlemcen" }, { code: "14", nom: "Tiaret" }, { code: "15", nom: "Tizi Ouzou" },
+  { code: "16", nom: "Alger" }, { code: "17", nom: "Djelfa" }, { code: "18", nom: "Jijel" },
+  { code: "19", nom: "Sétif" }, { code: "20", nom: "Saïda" }, { code: "21", nom: "Skikda" },
+  { code: "22", nom: "Sidi Bel Abbès" }, { code: "23", nom: "Annaba" }, { code: "24", nom: "Guelma" },
+  { code: "25", nom: "Constantine" }, { code: "26", nom: "Médéa" }, { code: "27", nom: "Mostaganem" },
+  { code: "28", nom: "M'Sila" }, { code: "29", nom: "Mascara" }, { code: "30", nom: "Ouargla" },
+  { code: "31", nom: "Oran" }, { code: "32", nom: "El Bayadh" }, { code: "33", nom: "Illizi" },
+  { code: "34", nom: "Bordj Bou Arréridj" }, { code: "35", nom: "Boumerdès" }, { code: "36", nom: "El Tarf" },
+  { code: "37", nom: "Tindouf" }, { code: "38", nom: "Tissemsilt" }, { code: "39", nom: "El Oued" },
+  { code: "40", nom: "Khenchela" }, { code: "41", nom: "Souk Ahras" }, { code: "42", nom: "Tipaza" },
+  { code: "43", nom: "Mila" }, { code: "44", nom: "Aïn Defla" }, { code: "45", nom: "Naâma" },
+  { code: "46", nom: "Aïn Témouchent" }, { code: "47", nom: "Ghardaïa" }, { code: "48", nom: "Relizane" },
+  { code: "49", nom: "Timimoun" }, { code: "50", nom: "Bordj Badji Mokhtar" },
+  { code: "51", nom: "Ouled Djellal" }, { code: "52", nom: "Béni Abbès" },
+  { code: "53", nom: "In Salah" }, { code: "54", nom: "In Guezzam" },
+  { code: "55", nom: "Touggourt" }, { code: "56", nom: "Djanet" },
+  { code: "57", nom: "El M'Ghair" }, { code: "58", nom: "El Menia" },
+]
+
+function SearchableSelect({
+  value, onChange, options, placeholder, label, required,
+}: {
+  value: string
+  onChange: (v: string) => void
+  options: { value: string; label: string }[]
+  placeholder: string
+  label: string
+  required?: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState("")
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [])
+
+  const filtered = options.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+  const selected = options.find(o => o.value === value)
+
+  return (
+    <div ref={ref} className="relative">
+      <label className="block text-xs font-medium mb-1.5" style={{ color: "#374151" }}>
+        {label} {required && <span style={{ color: "#DC2626" }}>*</span>}
+      </label>
+      <button
+        type="button"
+        onClick={() => setOpen(v => !v)}
+        className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none text-left flex items-center justify-between"
+        style={{ borderColor: value ? "#D97706" : "#E5E7EB", backgroundColor: "#fff" }}
+      >
+        <span style={{ color: selected ? "#374151" : "#9CA3AF" }}>{selected?.label ?? placeholder}</span>
+        <ChevronDown size={14} style={{ color: "#9CA3AF" }} />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden" style={{ maxHeight: "220px" }}>
+          <div className="p-2 border-b border-gray-100 sticky top-0 bg-white">
+            <div className="relative">
+              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2" style={{ color: "#9CA3AF" }} />
+              <input
+                type="text"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Rechercher..."
+                className="w-full pl-8 pr-3 py-1.5 text-xs border rounded focus:outline-none focus:ring-1 focus:ring-amber-400"
+                style={{ borderColor: "#E5E7EB" }}
+                autoFocus
+              />
+            </div>
+          </div>
+          <div className="overflow-y-auto" style={{ maxHeight: "160px" }}>
+            <button
+              type="button"
+              onClick={() => { onChange(""); setOpen(false); setSearch("") }}
+              className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50"
+              style={{ color: "#9CA3AF" }}
+            >
+              — Aucun —
+            </button>
+            {filtered.map(o => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => { onChange(o.value); setOpen(false); setSearch("") }}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-amber-50 border-b border-gray-50 last:border-0"
+                style={{ color: value === o.value ? "#D97706" : "#374151", fontWeight: value === o.value ? 600 : 400 }}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 interface DecesCase {
   codeCas: string
@@ -28,6 +135,8 @@ interface ApiResponse {
   meta: { totalDeces: number; periode: { dateDebut: string | null; dateFin: string | null }; genereLe: string }
 }
 
+interface MaladieOption { id: string; nom: string; codeCim10: string }
+
 export default function UistiMortalitePage() {
   const [data, setData] = useState<ApiResponse | null>(null)
   const [loading, setLoading] = useState(true)
@@ -37,9 +146,13 @@ export default function UistiMortalitePage() {
   const [expandedCas3, setExpandedCas3] = useState(true)
   const [showCas2Form, setShowCas2Form] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [maladies, setMaladies] = useState<MaladieOption[]>([])
 
   // Cas 2 form
-  const [form, setForm] = useState({ nomPatient: "", prenomPatient: "", dateDeces: "", maladieSuspectee: "", details: "" })
+  const [form, setForm] = useState({
+    nomPatient: "", prenomPatient: "", dateDeces: "",
+    maladieId: "", service: "", wilaya: "", dateAdmission: "", details: "",
+  })
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -53,22 +166,34 @@ export default function UistiMortalitePage() {
 
   useEffect(() => { fetchData() }, [fetchData])
 
+  useEffect(() => {
+    fetch("/api/maladies")
+      .then(r => r.json())
+      .then(d => setMaladies((d.maladies ?? []) as MaladieOption[]))
+      .catch(() => {})
+  }, [])
+
   const submitCas2 = async () => {
-    if (!form.nomPatient || !form.dateDeces || !form.maladieSuspectee) {
-      toast.error("Veuillez remplir les champs obligatoires")
+    if (!form.nomPatient || !form.dateDeces || !form.maladieId) {
+      toast.error("Veuillez remplir les champs obligatoires (nom, date du décès, pathologie MDO)")
       return
     }
+    const selectedMaladie = maladies.find(m => m.id === form.maladieId)
     setSubmitting(true)
     const res = await fetch("/api/uisti/mortalite", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(form),
+      body: JSON.stringify({
+        ...form,
+        maladieId: form.maladieId,
+        maladieSuspectee: selectedMaladie?.nom ?? "",
+      }),
     })
     setSubmitting(false)
     if (res.ok) {
-      toast.success("Alerte générée vers l'unité de surveillance épidémiologique")
+      toast.success("Déclaration pré-remplie créée et alerte générée vers le service épidémiologique")
       setShowCas2Form(false)
-      setForm({ nomPatient: "", prenomPatient: "", dateDeces: "", maladieSuspectee: "", details: "" })
+      setForm({ nomPatient: "", prenomPatient: "", dateDeces: "", maladieId: "", service: "", wilaya: "", dateAdmission: "", details: "" })
     } else {
       const err = await res.json()
       toast.error(err.error ?? "Erreur lors de l'envoi")
@@ -231,13 +356,35 @@ export default function UistiMortalitePage() {
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "#374151" }}>Date du décès <span style={{ color: "#DC2626" }}>*</span></label>
                 <input type="date" value={form.dateDeces} onChange={e => setForm(f => ({ ...f, dateDeces: e.target.value }))} className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400" style={{ borderColor: "#E5E7EB" }} />
               </div>
+              <SearchableSelect
+                label="Pathologie MDO suspectée"
+                placeholder="Sélectionner une maladie MDO..."
+                value={form.maladieId}
+                onChange={v => setForm(f => ({ ...f, maladieId: v }))}
+                options={maladies.map(m => ({ value: m.id, label: `${m.nom}${m.codeCim10 ? ` (${m.codeCim10})` : ""}` }))}
+                required
+              />
+              <SearchableSelect
+                label="Service hospitalier"
+                placeholder="Sélectionner un service..."
+                value={form.service}
+                onChange={v => setForm(f => ({ ...f, service: v }))}
+                options={SERVICES_EHU.map(s => ({ value: s.nom, label: s.nom }))}
+              />
+              <SearchableSelect
+                label="Wilaya de résidence"
+                placeholder="Sélectionner une wilaya..."
+                value={form.wilaya}
+                onChange={v => setForm(f => ({ ...f, wilaya: v }))}
+                options={WILAYAS.map(w => ({ value: w.nom, label: `${w.code} — ${w.nom}` }))}
+              />
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: "#374151" }}>Pathologie MDO suspectée <span style={{ color: "#DC2626" }}>*</span></label>
-                <input type="text" value={form.maladieSuspectee} onChange={e => setForm(f => ({ ...f, maladieSuspectee: e.target.value }))} className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400" style={{ borderColor: "#E5E7EB" }} placeholder="Ex : Choléra, Méningite..." />
+                <label className="block text-xs font-medium mb-1.5" style={{ color: "#374151" }}>Date d&apos;admission</label>
+                <input type="date" value={form.dateAdmission} onChange={e => setForm(f => ({ ...f, dateAdmission: e.target.value }))} className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400" style={{ borderColor: "#E5E7EB" }} />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs font-medium mb-1.5" style={{ color: "#374151" }}>Détails complémentaires</label>
-                <textarea value={form.details} onChange={e => setForm(f => ({ ...f, details: e.target.value }))} rows={3} className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" style={{ borderColor: "#E5E7EB" }} placeholder="Contexte clinique, service, informations utiles pour la déclaration rétrospective..." />
+                <textarea value={form.details} onChange={e => setForm(f => ({ ...f, details: e.target.value }))} rows={3} className="w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-400 resize-none" style={{ borderColor: "#E5E7EB" }} placeholder="Contexte clinique, informations utiles pour la déclaration rétrospective..." />
               </div>
             </div>
             <div className="flex items-center gap-3 pt-1">
@@ -338,7 +485,7 @@ export default function UistiMortalitePage() {
 
       {data && (
         <p className="text-xs text-right" style={{ color: "#9CA3AF" }}>
-          Données générées le {new Date(data.meta.genereLe).toLocaleString("fr-FR")}
+          Données générées le {new Date(data.meta.genereLe).toLocaleString("fr-DZ", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}
         </p>
       )}
     </div>

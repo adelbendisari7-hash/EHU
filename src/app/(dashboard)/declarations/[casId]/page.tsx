@@ -78,13 +78,45 @@ export default async function CasDetailPage({
   const canChangeStatus = session?.user.role === "epidemiologiste" || session?.user.role === "admin"
 
   // Completeness score
-  const completenessFields = [
-    cas.patient.firstName, cas.patient.lastName, cas.patient.dateOfBirth, cas.patient.sex,
-    cas.patient.address, cas.patient.commune?.nom,
-    cas.maladie?.nom, cas.dateDebutSymptomes, casTyped.observation,
-    cas.service, cas.etablissement?.nom,
+  // Retourne true uniquement si la valeur est réellement renseignée
+  // (rejette null, undefined, "", "—", et la date de naissance par défaut 2000-01-01)
+  function isFilled(v: unknown): boolean {
+    if (v === null || v === undefined) return false
+    if (typeof v === "string") {
+      const s = v.trim()
+      return s !== "" && s !== "—" && s !== "-"
+    }
+    if (v instanceof Date) {
+      // date par défaut injectée par l'API quand le champ était vide
+      return v.getFullYear() !== 2000
+    }
+    return true
+  }
+
+  // 16 champs du formulaire MDO répartis par section
+  const completenessFields: unknown[] = [
+    // Patient (6)
+    cas.patient.firstName,
+    cas.patient.lastName,
+    cas.patient.dateOfBirth,
+    cas.patient.sex,
+    cas.patient.address,
+    cas.patient.commune?.nom,
+    // Cas (5)
+    cas.maladie?.nom,
+    cas.commune?.nom,
+    cas.dateDebutSymptomes,
+    cas.dateDiagnostic,
+    cas.serviceDeclarant ?? cas.service,
+    // Déclaration (2)
+    cas.etablissementId,
+    cas.medecinDeclarantId,
+    // Clinique (3)
+    casTyped.observation,
+    casTyped.symptomesTexte ?? (cas.symptomes.length > 0 ? "ok" : null),
+    cas.evolution,
   ]
-  const filled = completenessFields.filter(Boolean).length
+  const filled = completenessFields.filter(isFilled).length
   const completeness = Math.round((filled / completenessFields.length) * 100)
 
   return (
@@ -210,6 +242,78 @@ export default async function CasDetailPage({
             </div>
 
             {/* Tab content */}
+            {tab === "investigation" && (
+              <div className="p-5">
+                {cas.investigation ? (
+                  <div className="space-y-4">
+                    {/* Investigation summary banner */}
+                    <div className="flex items-center justify-between px-4 py-3 rounded-lg border" style={{ backgroundColor: cas.investigation.statut === "terminee" ? "#F0FDF4" : "#FFFBEB", borderColor: cas.investigation.statut === "terminee" ? "#BBF7D0" : "#FDE68A" }}>
+                      <div className="flex items-center gap-4">
+                        <div>
+                          <p className="text-xs font-medium uppercase tracking-wider" style={{ color: cas.investigation.statut === "terminee" ? "#15803D" : "#92400E" }}>Statut investigation</p>
+                          <p className="text-sm font-semibold" style={{ color: cas.investigation.statut === "terminee" ? "#15803D" : "#B45309" }}>
+                            {cas.investigation.statut === "en_cours" ? "En cours" : cas.investigation.statut === "terminee" ? "Terminée" : "En attente"}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Lancée le</p>
+                          <p className="text-sm font-semibold text-gray-700">{formatDate(cas.investigation.dateDebut)}</p>
+                        </div>
+                        {cas.investigation.epidemiologiste && (
+                          <div>
+                            <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Épidémiologiste</p>
+                            <p className="text-sm font-semibold text-gray-700">
+                              {cas.investigation.epidemiologiste.firstName} {cas.investigation.epidemiologiste.lastName}
+                            </p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Contacts tracés</p>
+                          <p className="text-sm font-semibold text-gray-700">{cas.investigation.contacts.length}</p>
+                        </div>
+                      </div>
+                      <Link
+                        href={`/declarations/${casId}/investigation`}
+                        className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-colors"
+                        style={{ backgroundColor: "#1B4F8A" }}
+                      >
+                        Ouvrir l'investigation →
+                      </Link>
+                    </div>
+                    {/* Conclusion si terminée */}
+                    {cas.investigation.conclusion && (
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Conclusion</p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{cas.investigation.conclusion}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "#EFF6FF" }}>
+                      <svg className="w-7 h-7" style={{ color: "#1B4F8A" }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <p className="text-gray-600 font-medium mb-1">Aucune investigation lancée</p>
+                    <p className="text-sm text-gray-400 mb-6">Une investigation épidémiologique permet de tracer les contacts et identifier la source de contamination.</p>
+                    {canChangeStatus && (
+                      <Link
+                        href={`/declarations/${casId}/investigation`}
+                        className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-white font-medium transition-colors"
+                        style={{ backgroundColor: "#1B4F8A" }}
+                      >
+                        Lancer l'investigation
+                      </Link>
+                    )}
+                    {!canChangeStatus && (
+                      <p className="text-xs text-gray-400">Seuls les épidémiologistes et administrateurs peuvent lancer une investigation.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {tab === "timeline" && (
               <div className="p-5">
                 {timeline.length === 0 ? (
@@ -244,7 +348,7 @@ export default async function CasDetailPage({
               </div>
             )}
 
-            {tab !== "timeline" && <div className="p-5 space-y-4">
+            {tab === "clinique" && <div className="p-5 space-y-4">
               {/* Observation badge — Confirmé / Suspect */}
               {casTyped.observation && (
                 <div className={`flex items-center gap-3 px-4 py-3 rounded-lg border ${
@@ -376,116 +480,132 @@ export default async function CasDetailPage({
                 </div>
               )}
 
-              {/* Résultats Laboratoire */}
-              {cas.resultatsLabo.length > 0 && (
-                <div className="bg-gray-50 rounded-lg p-3">
-                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Résultats Laboratoire</p>
-                  <div className="space-y-3">
-                    {cas.resultatsLabo.map(r => (
-                      <div key={r.id} className="bg-white rounded-lg border border-gray-100 p-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium text-gray-800">{r.typePrelevement}</span>
-                          {r.resultat && (
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                              r.resultat === "positif" ? "bg-red-100 text-red-700" :
-                              r.resultat === "negatif" ? "bg-green-100 text-green-700" :
-                              "bg-gray-100 text-gray-600"
-                            }`}>
-                              {r.resultat}
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-500 space-y-0.5">
-                          <p>Prélèvement : {formatDate(r.datePrelevement)}</p>
-                          {r.germe && <p>Germe : <span className="font-medium text-gray-700">{r.germe.nom}</span></p>}
-                          {r.laboratoire && <p>Laboratoire : {r.laboratoire}</p>}
-                          {r.antibiogramme && <p>Antibiogramme : {r.antibiogramme}</p>}
-                          {r.notes && <p>Notes : {r.notes}</p>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Patient address */}
               <div className="bg-gray-50 rounded-lg p-3">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-1">Adresse Patient</p>
                 <p className="text-sm text-gray-700">{cas.patient.address}</p>
               </div>
 
-              {/* Pièces jointes */}
-              {cas.fichiers.length > 0 && (
+              {/* Pièces jointes de déclaration */}
+              {cas.fichiers.filter(f => f.type === "declaration").length > 0 && (
                 <div className="bg-gray-50 rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-3">
                     <Paperclip size={14} className="text-gray-400" />
                     <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Pièces jointes</p>
-                    <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">{cas.fichiers.length}</span>
+                    <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">
+                      {cas.fichiers.filter(f => f.type === "declaration").length}
+                    </span>
                   </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {cas.fichiers.filter(f => f.type === "declaration").map(f => {
+                      const isImage = /\.(jpe?g|png|webp|gif)$/i.test(f.filename)
+                      return (
+                        <a
+                          key={f.id}
+                          href={f.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="group flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white hover:border-[#1B4F8A] hover:shadow-sm transition-all"
+                        >
+                          {isImage ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={f.url} alt={f.filename} className="w-full h-28 object-cover bg-gray-100" />
+                          ) : (
+                            <div className="w-full h-28 flex flex-col items-center justify-center bg-red-50 gap-2">
+                              <FileText size={32} className="text-red-400" />
+                              <span className="text-[10px] text-red-500 font-medium uppercase">PDF</span>
+                            </div>
+                          )}
+                          <div className="px-2 py-1.5 flex items-center gap-1.5">
+                            {isImage ? <ImageIcon size={11} className="text-blue-400 shrink-0" /> : <FileText size={11} className="text-red-400 shrink-0" />}
+                            <span className="text-[11px] text-gray-600 truncate group-hover:text-[#1B4F8A]">{f.filename}</span>
+                          </div>
+                        </a>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>}
 
-                  {/* Declaration proof files */}
-                  {cas.fichiers.filter(f => f.type === "declaration").length > 0 && (
-                    <div className="mb-3">
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Preuve de déclaration</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        {cas.fichiers.filter(f => f.type === "declaration").map(f => {
-                          const isPdf = f.filename.toLowerCase().endsWith(".pdf") || f.url.toLowerCase().endsWith(".pdf")
-                          const isImage = /\.(jpe?g|png|webp|gif)$/i.test(f.filename)
-                          return (
-                            <a
-                              key={f.id}
-                              href={f.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="group flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white hover:border-[#1B4F8A] hover:shadow-sm transition-all"
-                            >
-                              {isImage ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={f.url} alt={f.filename} className="w-full h-28 object-cover bg-gray-100" />
-                              ) : (
-                                <div className="w-full h-28 flex flex-col items-center justify-center bg-red-50 gap-2">
-                                  <FileText size={32} className="text-red-400" />
-                                  <span className="text-[10px] text-red-500 font-medium uppercase">PDF</span>
-                                </div>
-                              )}
-                              <div className="px-2 py-1.5 flex items-center gap-1.5">
-                                {isImage ? <ImageIcon size={11} className="text-blue-400 shrink-0" /> : <FileText size={11} className="text-red-400 shrink-0" />}
-                                <span className="text-[11px] text-gray-600 truncate group-hover:text-[#1B4F8A]">{f.filename}</span>
-                              </div>
-                            </a>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
+            {tab === "labo" && <div className="p-5 space-y-4">
+              {/* Résultats de prélèvement (champ texte libre) */}
+              {cas.resultatLabo && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider mb-2">Résultats de prélèvement</p>
+                  <p className="text-sm text-gray-700 whitespace-pre-wrap">{cas.resultatLabo}</p>
+                </div>
+              )}
 
-                  {/* Lab result files */}
-                  {cas.fichiers.filter(f => f.type === "resultat_labo").length > 0 && (
-                    <div>
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Documents de laboratoire</p>
-                      <div className="space-y-1.5">
-                        {cas.fichiers.filter(f => f.type === "resultat_labo").map(f => {
-                          const isPdf = /\.pdf$/i.test(f.filename)
-                          return (
-                            <a
-                              key={f.id}
-                              href={f.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="flex items-center gap-2.5 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:border-[#1B4F8A] hover:shadow-sm transition-all group"
-                            >
-                              {isPdf
-                                ? <FileText size={15} className="text-red-400 shrink-0" />
-                                : <ImageIcon size={15} className="text-blue-400 shrink-0" />
-                              }
-                              <span className="flex-1 text-xs text-gray-700 truncate group-hover:text-[#1B4F8A]">{f.filename}</span>
-                              <span className="text-[10px] text-[#1B4F8A] font-medium opacity-0 group-hover:opacity-100 transition-opacity shrink-0">Voir →</span>
-                            </a>
-                          )
-                        })}
+              {/* Résultats Laboratoire structurés */}
+              {cas.resultatsLabo.length > 0 ? (
+                <div className="space-y-3">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Résultats de laboratoire</p>
+                  {cas.resultatsLabo.map(r => (
+                    <div key={r.id} className="bg-white rounded-lg border border-gray-100 p-4 shadow-sm">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-sm font-semibold text-gray-800">{r.typePrelevement}</span>
+                        {r.resultat && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            r.resultat === "positif" ? "bg-red-100 text-red-700" :
+                            r.resultat === "negatif" ? "bg-green-100 text-green-700" :
+                            "bg-gray-100 text-gray-600"
+                          }`}>
+                            {r.resultat}
+                          </span>
+                        )}
                       </div>
+                      <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-gray-500">
+                        <p>Date prélèvement : <span className="font-medium text-gray-700">{formatDate(r.datePrelevement)}</span></p>
+                        {r.datResultat && <p>Date résultat : <span className="font-medium text-gray-700">{formatDate(r.datResultat)}</span></p>}
+                        {r.germe && <p>Germe : <span className="font-medium text-gray-700">{r.germe.nom}</span></p>}
+                        {r.laboratoire && <p>Laboratoire : <span className="font-medium text-gray-700">{r.laboratoire}</span></p>}
+                      </div>
+                      {r.antibiogramme && (
+                        <p className="mt-2 text-xs text-gray-500">Antibiogramme : <span className="text-gray-700">{r.antibiogramme}</span></p>
+                      )}
+                      {r.notes && (
+                        <p className="mt-1 text-xs text-gray-500">Notes : <span className="text-gray-700">{r.notes}</span></p>
+                      )}
                     </div>
-                  )}
+                  ))}
+                </div>
+              ) : !cas.resultatLabo && (
+                <div className="text-center py-10 text-gray-400 text-sm">Aucun résultat de laboratoire enregistré</div>
+              )}
+
+              {/* Pièces jointes laboratoire */}
+              {cas.fichiers.filter(f => f.type === "resultat_labo").length > 0 && (
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Paperclip size={14} className="text-gray-400" />
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wider">Documents de laboratoire</p>
+                    <span className="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">
+                      {cas.fichiers.filter(f => f.type === "resultat_labo").length}
+                    </span>
+                  </div>
+                  <div className="space-y-1.5">
+                    {cas.fichiers.filter(f => f.type === "resultat_labo").map(f => {
+                      const isPdf = /\.pdf$/i.test(f.filename)
+                      const isImage = /\.(jpe?g|png|webp|gif)$/i.test(f.filename)
+                      return (
+                        <a
+                          key={f.id}
+                          href={f.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="flex items-center gap-2.5 px-3 py-2 bg-white border border-gray-200 rounded-lg hover:border-[#1B4F8A] hover:shadow-sm transition-all group"
+                        >
+                          {isPdf
+                            ? <FileText size={15} className="text-red-400 shrink-0" />
+                            : <ImageIcon size={15} className="text-blue-400 shrink-0" />
+                          }
+                          <span className="flex-1 text-xs text-gray-700 truncate group-hover:text-[#1B4F8A]">{f.filename}</span>
+                          <span className="text-[10px] text-[#1B4F8A] font-medium opacity-0 group-hover:opacity-100 transition-opacity shrink-0">Voir →</span>
+                        </a>
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </div>}

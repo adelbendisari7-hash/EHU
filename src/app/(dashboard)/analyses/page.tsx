@@ -10,19 +10,33 @@ import DashboardFilters, { type DashboardFiltersState } from "@/components/dashb
 
 const COLORS = ["#1B4F8A", "#3A7BD5", "#E74C3C", "#F39C12", "#27AE60", "#7C3AED", "#5499E8", "#8AB8F5"]
 
-const STATUT_LABELS: Record<string, string> = {
-  brouillon: "Brouillon",
-  suspect: "Suspect",
-  confirme: "Confirmé",
+const CAT_COLORS: Record<string, string> = {
+  pev: "#7C3AED",
+  mth: "#2563EB",
+  zoonose: "#D97706",
+  ist: "#DC2626",
+  vectorielle: "#EA580C",
+  nosocomiale: "#059669",
+  autre: "#6B7280",
+}
+
+const EVOLUTION_COLORS: Record<string, string> = {
+  "Guérison": "#16A34A",
+  "En cours de guérison": "#22C55E",
+  "Sortant": "#0891B2",
+  "Toujours malade": "#F59E0B",
+  "Autre": "#6B7280",
+  "Décès": "#DC2626",
 }
 
 interface AnalyticsData {
-  prevalence: { name: string; count: number }[]
-  statutDistribution: { name: string; count: number }[]
+  categorieDistribution: { name: string; key: string; count: number }[]
+  evolutionDistribution: { name: string; count: number }[]
   ageDistribution: { name: string; count: number }[]
   sexDistribution: { name: string; count: number }[]
   weeklyTrend: { date: string; count: number }[]
   communeDistribution: { name: string; count: number }[]
+  wilayadDistribution?: { name: string; count: number }[]
   summary: {
     total: number
     confirmes: number
@@ -30,10 +44,12 @@ interface AnalyticsData {
     maladiesDeclarees: number
     totalMaladies: number
     communesTouchees: number
+    hospitalisations: number
+    evacuations: number
   }
 }
 
-interface RefItem { id: string; nom: string }
+interface RefItem { id: string; nom: string; groupeEpidemiologique?: string | null }
 interface WilayaItem extends RefItem { code: string }
 interface CommuneItem extends RefItem { wilayadId: string }
 
@@ -56,20 +72,27 @@ export default function AnalysesPage() {
 
   const fetchData = useCallback(async () => {
     setLoading(true)
-    const params = new URLSearchParams()
-    if (filters.dateDebut || filters.dateFin) {
-      if (filters.dateDebut) params.set("dateDebut", filters.dateDebut)
-      if (filters.dateFin) params.set("dateFin", filters.dateFin)
-    } else {
-      params.set("days", filters.days)
+    try {
+      const params = new URLSearchParams()
+      if (filters.dateDebut || filters.dateFin) {
+        if (filters.dateDebut) params.set("dateDebut", filters.dateDebut)
+        if (filters.dateFin) params.set("dateFin", filters.dateFin)
+      } else {
+        params.set("days", filters.days)
+      }
+      if (filters.maladieIds.length > 0) params.set("maladieIds", filters.maladieIds.join(","))
+      if (filters.wilayadIds.length > 0) params.set("wilayadIds", filters.wilayadIds.join(","))
+      if (filters.communeIds.length > 0) params.set("communeIds", filters.communeIds.join(","))
+      if (filters.services.length > 0) params.set("services", filters.services.join(","))
+      const res = await fetch(`/api/stats/analyses?${params}`)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const json = await res.json()
+      if (json && json.summary) setData(json)
+    } catch (err) {
+      console.error("Analyses fetch error:", err)
+    } finally {
+      setLoading(false)
     }
-    if (filters.maladieIds.length > 0) params.set("maladieIds", filters.maladieIds.join(","))
-    if (filters.wilayadIds.length > 0) params.set("wilayadIds", filters.wilayadIds.join(","))
-    if (filters.communeIds.length > 0) params.set("communeIds", filters.communeIds.join(","))
-    if (filters.services.length > 0) params.set("services", filters.services.join(","))
-    const res = await fetch(`/api/stats/analyses?${params}`)
-    setData(await res.json())
-    setLoading(false)
   }, [filters])
 
   useEffect(() => { void fetchData() }, [fetchData])
@@ -106,20 +129,18 @@ export default function AnalysesPage() {
 
       {/* Summary cards */}
       {data && (
-        <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
           {[
             { label: "TOTAL CAS", value: data.summary.total, color: "#1B4F8A" },
+            { label: "CONFIRMÉS", value: data.summary.confirmes, color: "#27AE60" },
             { label: "COMMUNES TOUCHÉES", value: data.summary.communesTouchees, color: "#0891B2" },
             { label: "TAUX CONFIRMATION", value: `${data.summary.tauxConfirmation}%`, color: "#F39C12" },
-            {
-              label: "PROFIL MDO",
-              value: `${data.summary.maladiesDeclarees}/${data.summary.totalMaladies}`,
-              color: "#27AE60",
-            },
+            { label: "HOSPITALISATIONS", value: data.summary.hospitalisations, color: "#7C3AED" },
+            { label: "ÉVACUATIONS", value: data.summary.evacuations, color: "#DC2626" },
           ].map(card => (
             <div key={card.label} className="bg-white rounded-xl border border-gray-100 p-4 shadow-sm">
               <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-1">{card.label}</p>
-              <p className="text-3xl font-bold" style={{ color: card.color }}>{card.value}</p>
+              <p className="text-2xl font-bold" style={{ color: card.color }}>{card.value}</p>
             </div>
           ))}
         </div>
@@ -129,18 +150,25 @@ export default function AnalysesPage() {
         <div className="flex items-center justify-center h-64 text-sm text-gray-400">Chargement des analyses...</div>
       ) : data && (
         <div className="space-y-4">
-          {/* Prevalence + Weekly trend */}
+          {/* Catégorie distribution + Weekly trend */}
           <div className="grid grid-cols-2 gap-4">
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <p className="text-sm font-semibold text-gray-700 mb-3">Effectif par Maladie</p>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Répartition par Catégorie de Maladie</p>
               <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={data.prevalence} layout="vertical" margin={{ left: 10, right: 20 }}>
+                <BarChart data={data.categorieDistribution} layout="vertical" margin={{ left: 10, right: 90 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#EBEDEF" horizontal={false} />
                   <XAxis type="number" tick={{ fontSize: 11, fill: "#8A909B" }} tickLine={false} axisLine={false} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10, fill: "#4A5164" }} tickLine={false} axisLine={false} width={130} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#4A5164" }} tickLine={false} axisLine={false} width={100} />
                   <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #EBEDEF", fontSize: "12px" }} formatter={(v) => [v, "Cas"]} />
                   <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                    {data.prevalence.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                    {data.categorieDistribution.map((entry) => (
+                      <Cell key={entry.key} fill={CAT_COLORS[entry.key] ?? "#6B7280"} />
+                    ))}
+                    <LabelList dataKey="count" position="right" formatter={(v: unknown) => {
+                      const total = data.categorieDistribution.reduce((s, d) => s + d.count, 0)
+                      const pct = total > 0 ? Math.round(Number(v) / total * 100) : 0
+                      return `${v} (${pct}%)`
+                    }} style={{ fontSize: 11, fill: "#6B7280", fontWeight: 600 }} />
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -160,30 +188,68 @@ export default function AnalysesPage() {
             </div>
           </div>
 
-          {/* Commune distribution */}
-          {data.communeDistribution && data.communeDistribution.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <p className="text-sm font-semibold text-gray-700 mb-3">
-                Répartition par Commune
-                <span className="ml-2 text-[11px] font-normal text-gray-400">(top {data.communeDistribution.length})</span>
-              </p>
-              <ResponsiveContainer width="100%" height={Math.max(180, data.communeDistribution.length * 28)}>
-                <BarChart data={data.communeDistribution} layout="vertical" margin={{ left: 10, right: 40 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#EBEDEF" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 11, fill: "#8A909B" }} tickLine={false} axisLine={false} allowDecimals={false} />
-                  <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#4A5164" }} tickLine={false} axisLine={false} width={120} />
-                  <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #EBEDEF", fontSize: "12px" }} formatter={(v) => [v, "Cas"]} />
-                  <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={16}>
-                    {data.communeDistribution.map((entry, i) => {
-                      const max = data.communeDistribution[0]?.count ?? 1
-                      const ratio = entry.count / max
-                      const color = ratio > 0.7 ? "#E74C3C" : ratio > 0.4 ? "#F39C12" : "#1B4F8A"
-                      return <Cell key={i} fill={color} />
-                    })}
-                    <LabelList dataKey="count" position="right" style={{ fontSize: 11, fill: "#6B7280", fontWeight: 600 }} />
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
+          {/* Commune + Wilaya distribution */}
+          {(data.communeDistribution?.length > 0 || (data.wilayadDistribution?.length ?? 0) > 0) && (
+            <div className="grid grid-cols-2 gap-4">
+              {data.communeDistribution && data.communeDistribution.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-3">
+                    Répartition par Commune
+                    <span className="ml-2 text-[11px] font-normal text-gray-400">(top {data.communeDistribution.length})</span>
+                  </p>
+                  <ResponsiveContainer width="100%" height={Math.max(180, data.communeDistribution.length * 28)}>
+                    <BarChart data={data.communeDistribution} layout="vertical" margin={{ left: 10, right: 90 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#EBEDEF" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: "#8A909B" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#4A5164" }} tickLine={false} axisLine={false} width={120} />
+                      <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #EBEDEF", fontSize: "12px" }} formatter={(v) => [v, "Cas"]} />
+                      <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={16}>
+                        {data.communeDistribution.map((entry, i) => {
+                          const max = data.communeDistribution[0]?.count ?? 1
+                          const ratio = entry.count / max
+                          const color = ratio > 0.7 ? "#E74C3C" : ratio > 0.4 ? "#F39C12" : "#1B4F8A"
+                          return <Cell key={i} fill={color} />
+                        })}
+                        <LabelList dataKey="count" position="right" formatter={(v: unknown) => {
+                          const total = data.communeDistribution.reduce((s, d) => s + d.count, 0)
+                          const pct = total > 0 ? Math.round(Number(v) / total * 100) : 0
+                          return `${v} (${pct}%)`
+                        }} style={{ fontSize: 11, fill: "#6B7280", fontWeight: 600 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+
+              {data.wilayadDistribution && data.wilayadDistribution.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+                  <p className="text-sm font-semibold text-gray-700 mb-3">
+                    Répartition par Wilaya
+                    <span className="ml-2 text-[11px] font-normal text-gray-400">(top {data.wilayadDistribution.length})</span>
+                  </p>
+                  <ResponsiveContainer width="100%" height={Math.max(180, data.wilayadDistribution.length * 28)}>
+                    <BarChart data={data.wilayadDistribution} layout="vertical" margin={{ left: 10, right: 90 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#EBEDEF" horizontal={false} />
+                      <XAxis type="number" tick={{ fontSize: 11, fill: "#8A909B" }} tickLine={false} axisLine={false} allowDecimals={false} />
+                      <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#4A5164" }} tickLine={false} axisLine={false} width={120} />
+                      <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #EBEDEF", fontSize: "12px" }} formatter={(v) => [v, "Cas"]} />
+                      <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={16}>
+                        {data.wilayadDistribution.map((entry, i) => {
+                          const max = data.wilayadDistribution![0]?.count ?? 1
+                          const ratio = entry.count / max
+                          const color = ratio > 0.7 ? "#7C3AED" : ratio > 0.4 ? "#0891B2" : "#1B4F8A"
+                          return <Cell key={i} fill={color} />
+                        })}
+                        <LabelList dataKey="count" position="right" formatter={(v: unknown) => {
+                          const total = (data.wilayadDistribution ?? []).reduce((s, d) => s + d.count, 0)
+                          const pct = total > 0 ? Math.round(Number(v) / total * 100) : 0
+                          return `${v} (${pct}%)`
+                        }} style={{ fontSize: 11, fill: "#6B7280", fontWeight: 600 }} />
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
           )}
 
@@ -192,12 +258,18 @@ export default function AnalysesPage() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
               <p className="text-sm font-semibold text-gray-700 mb-3">Répartition par Âge</p>
               <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={data.ageDistribution} margin={{ left: -10 }}>
+                <BarChart data={data.ageDistribution} margin={{ top: 24, left: -10, right: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#EBEDEF" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#8A909B" }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: "#8A909B" }} tickLine={false} axisLine={false} allowDecimals={false} />
                   <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #EBEDEF", fontSize: "12px" }} formatter={(v) => [v, "Cas"]} />
-                  <Bar dataKey="count" fill="#1B4F8A" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="count" fill="#1B4F8A" radius={[4, 4, 0, 0]}>
+                    <LabelList dataKey="count" position="top" formatter={(v: unknown) => {
+                      const total = data.ageDistribution.reduce((s, d) => s + d.count, 0)
+                      const pct = total > 0 ? Math.round(Number(v) / total * 100) : 0
+                      return `${v} (${pct}%)`
+                    }} style={{ fontSize: 10, fill: "#6B7280", fontWeight: 600 }} />
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -213,8 +285,8 @@ export default function AnalysesPage() {
                     cx="50%"
                     cy="50%"
                     outerRadius={70}
-                    label={({ name, percent }: { name?: string; percent?: number }) =>
-                      `${name ?? ""} ${((percent ?? 0) * 100).toFixed(0)}%`
+                    label={({ name, percent, value }: { name?: string; percent?: number; value?: number }) =>
+                      `${name ?? ""} ${value ?? 0} (${((percent ?? 0) * 100).toFixed(0)}%)`
                     }
                     labelLine={false}
                   >
@@ -226,24 +298,29 @@ export default function AnalysesPage() {
             </div>
 
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
-              <p className="text-sm font-semibold text-gray-700 mb-3">Répartition par Statut</p>
-              <div className="space-y-2 mt-2">
-                {data.statutDistribution.map((s, i) => {
-                  const total = data.statutDistribution.reduce((a, b) => a + b.count, 0)
-                  const pct = total > 0 ? Math.round((s.count / total) * 100) : 0
-                  return (
-                    <div key={s.name}>
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-gray-600">{STATUT_LABELS[s.name] ?? s.name}</span>
-                        <span className="font-medium text-gray-800">{s.count} ({pct}%)</span>
+              <p className="text-sm font-semibold text-gray-700 mb-3">Répartition par l&apos;Évolution</p>
+              {data.evolutionDistribution.length === 0 ? (
+                <p className="text-xs text-gray-400 mt-4 text-center">Aucune donnée d&apos;évolution renseignée</p>
+              ) : (
+                <div className="space-y-2 mt-2">
+                  {data.evolutionDistribution.map((s) => {
+                    const total = data.evolutionDistribution.reduce((a, b) => a + b.count, 0)
+                    const pct = total > 0 ? Math.round((s.count / total) * 100) : 0
+                    const color = EVOLUTION_COLORS[s.name] ?? "#6B7280"
+                    return (
+                      <div key={s.name}>
+                        <div className="flex items-center justify-between text-xs mb-1">
+                          <span className="text-gray-600">{s.name}</span>
+                          <span className="font-medium text-gray-800">{s.count} ({pct}%)</span>
+                        </div>
+                        <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: color }} />
+                        </div>
                       </div>
-                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                        <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: COLORS[i % COLORS.length] }} />
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

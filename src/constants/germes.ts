@@ -46,4 +46,39 @@ export const GERMES: GermeRef[] = [
   // ── Autres agents bactériens (B96) ─────────────────────────────────────────
   { code: "B96.4", nom: "Proteus mirabilis", type: "bacterie" },
   { code: "B96.9", nom: "Morganella morganii", type: "bacterie" },
+
+  // ── Germes UHH — liste de référence EHU Oran ─────────────────────────────
+  { code: "B96.1",  nom: "Klebsiella pneumoniae",                      type: "bacterie" },
+  { code: "B96.2",  nom: "Escherichia coli",                           type: "bacterie" },
+  { code: "B95.6",  nom: "Staphylococcus aureus",                      type: "bacterie" },
+  { code: "U82.3a", nom: "Pseudomonas aeruginosa",                     type: "bacterie" },
+  { code: "B96.89", nom: "Enterobacter sp",                            type: "bacterie" },
+  { code: "U82.4a", nom: "Acinetobacter baumannii",                    type: "bacterie" },
+  { code: "U82.2z", nom: "Enterobacter cloacae",                       type: "bacterie" },
+  { code: "B96.89", nom: "Serratia marcescens",                        type: "bacterie" },
+  { code: "B96.89", nom: "Raoultella ornithinolytica",                 type: "bacterie" },
+  { code: "B95.2",  nom: "Enterococcus spp",                           type: "bacterie" },
+  { code: "B95.4",  nom: "Streptococcus gordonii",                     type: "bacterie" },
+  { code: "B95.7",  nom: "Staphylococcus à coagulase négative (SCN)", type: "bacterie" },
+  { code: "B96.89", nom: "Corynebacterium striatum",                   type: "bacterie" },
+  { code: "U82.8b", nom: "Stenotrophomonas maltophilia",               type: "bacterie" },
 ]
+
+// Noms canoniques des 15 germes UHH de référence EHU Oran
+export const UHH_GERMES_NOMS = [
+  "Klebsiella pneumoniae",
+  "Escherichia coli",
+  "Staphylococcus aureus",
+  "Pseudomonas aeruginosa",
+  "Enterobacter sp",
+  "Acinetobacter baumannii",
+  "Enterobacter cloacae",
+  "Morganella morganii",
+  "Serratia marcescens",
+  "Raoultella ornithinolytica",
+  "Enterococcus spp",
+  "Streptococcus gordonii",
+  "Staphylococcus à coagulase négative (SCN)",
+  "Corynebacterium striatum",
+  "Stenotrophomonas maltophilia",
+] as const

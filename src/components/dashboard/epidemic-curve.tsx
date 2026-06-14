@@ -5,10 +5,11 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 interface DataPoint { date: string; count: number }
 
 export default function EpidemicCurve({ data }: { data: DataPoint[] }) {
-  const formatted = data.map(d => ({
-    ...d,
-    label: new Date(d.date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }),
-  }))
+  const formatted = data.map(d => {
+    // d.date is "YYYY-MM-DD" — split directly to avoid UTC vs local timezone issues
+    const [, mm, dd] = d.date.split("-")
+    return { ...d, label: `${dd}/${mm}` }
+  })
 
   if (!data.length) {
     return (

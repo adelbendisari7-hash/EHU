@@ -7,11 +7,11 @@ import { exportAnalysesExcel, type AnalyticsExcelData } from "@/utils/export-exc
 
 interface AnalyticsData {
   summary: { total: number; confirmes: number; tauxConfirmation: number; maladiesDeclarees: number; totalMaladies: number; communesTouchees: number }
-  prevalence: { name: string; count: number }[]
+  categorieDistribution: { name: string; key: string; count: number }[]
+  evolutionDistribution: { name: string; count: number }[]
   weeklyTrend: { date: string; count: number }[]
   ageDistribution: { name: string; count: number }[]
   sexDistribution: { name: string; count: number }[]
-  statutDistribution: { name: string; count: number }[]
 }
 
 interface Props {

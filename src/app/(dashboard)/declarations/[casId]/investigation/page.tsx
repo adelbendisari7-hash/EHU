@@ -37,6 +37,7 @@ export default function InvestigationPage() {
   const [investigation, setInvestigation] = useState<Investigation | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchInvestigation = useCallback(async () => {
     // First check if investigation exists for this case
@@ -57,13 +58,24 @@ export default function InvestigationPage() {
 
   const startInvestigation = async () => {
     setCreating(true)
-    await fetch("/api/investigations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ casId }),
-    })
-    setCreating(false)
-    fetchInvestigation()
+    setError(null)
+    try {
+      const res = await fetch("/api/investigations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ casId }),
+      })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setError(data.error ?? `Erreur ${res.status}`)
+      } else {
+        await fetchInvestigation()
+      }
+    } catch {
+      setError("Erreur réseau — veuillez réessayer.")
+    } finally {
+      setCreating(false)
+    }
   }
 
   const closeInvestigation = async () => {
@@ -102,6 +114,9 @@ export default function InvestigationPage() {
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-12 text-center">
           <p className="text-gray-500 mb-2">Aucune investigation lancée pour ce cas.</p>
           <p className="text-sm text-gray-400 mb-6">Vous devez être épidémiologiste pour lancer une investigation.</p>
+          {error && (
+            <div className="mb-4 px-4 py-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-700">{error}</div>
+          )}
           <button onClick={startInvestigation} disabled={creating} className="px-6 py-3 rounded-lg text-white font-medium transition-colors disabled:opacity-60" style={{ backgroundColor: "#1B4F8A" }}>
             {creating ? "Lancement..." : "Lancer l'Investigation"}
           </button>

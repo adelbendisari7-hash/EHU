@@ -10,7 +10,8 @@ export const MALADIES_SEED = [
   // CATÉGORIE 1 — Surveillance nationale (44 maladies)
   // ══════════════════════════════════════════════════════════════════════════
 
-  // ─── Déclaration en urgence (< 4h + appel téléphonique) ──────────────────
+  // ─── Déclaration en urgence / Immédiat ───────────────────────────────────
+  // Seuil d'alerte : 1 cas = déclaration immédiate ; période de détection : 1 jour
 
   {
     nom: "Infections à bactéries multi-résistantes (BMR)",
@@ -18,7 +19,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "urgence",
     nomCourt: "BMR",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas BTR ou ≥ 2 cas liés
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -30,7 +32,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "urgence",
     nomCourt: "ISO",
-    seuilDefaut: 1,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas même type de chirurgie
+    periodeDefautJours: 7, // fenêtre pratique pour regrouper les ISO du même service
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -42,7 +45,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "urgence",
     nomCourt: "Méningite Hib",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -55,7 +59,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "urgence",
     nomCourt: "Méningite méning.",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -68,7 +73,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "urgence",
     nomCourt: "Méningite pneumo",
-    seuilDefaut: 1,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -81,7 +87,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "urgence",
     nomCourt: "Méningite virale",
-    seuilDefaut: 1,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -94,7 +101,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "urgence",
     nomCourt: "Méningo-encéph.",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -106,7 +114,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "urgence",
     nomCourt: "Paludisme",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -118,7 +127,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "urgence",
     nomCourt: "PFA",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -131,7 +141,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "urgence",
     nomCourt: "PAVM",
-    seuilDefaut: 1,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas même service / 7j
+    periodeDefautJours: 7, // PDF : explicitement « / 7j »
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -139,6 +150,7 @@ export const MALADIES_SEED = [
   },
 
   // ─── Déclaration quotidienne (24h) ────────────────────────────────────────
+  // Période de détection : 1 jour (correspondant au délai de déclaration)
 
   {
     nom: "Botulisme",
@@ -146,7 +158,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Botulisme",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -158,7 +171,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Brucellose",
-    seuilDefaut: 5,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas
+    periodeDefautJours: 1,
     categorieGravite: "moderee",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -170,7 +184,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Charbon",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -182,7 +197,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Coqueluche",
-    seuilDefaut: 5,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas
+    periodeDefautJours: 1,
     categorieGravite: "grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -194,7 +210,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Diphtérie",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -207,7 +224,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Dysenterie",
-    seuilDefaut: 10,
+    seuilDefaut: 3,        // PDF : ≥ 3 cas
+    periodeDefautJours: 1,
     categorieGravite: "moderee",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -219,7 +237,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Kyste hydatique",
-    seuilDefaut: 5,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas
+    periodeDefautJours: 1,
     categorieGravite: "grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -231,7 +250,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Typhoïde",
-    seuilDefaut: 5,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas
+    periodeDefautJours: 1,
     categorieGravite: "grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -243,7 +263,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Hépatite A",
-    seuilDefaut: 10,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas
+    periodeDefautJours: 1,
     categorieGravite: "moderee",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -255,7 +276,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Légionellose",
-    seuilDefaut: 1,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -267,7 +289,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Leish. cutanée",
-    seuilDefaut: 10,
+    seuilDefaut: 3,        // PDF : ≥ 3 cas / localité
+    periodeDefautJours: 1,
     categorieGravite: "moderee",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -279,7 +302,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Leish. viscérale",
-    seuilDefaut: 3,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -291,7 +315,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Lèpre",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "moderee",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -303,7 +328,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Leptospirose",
-    seuilDefaut: 5,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -315,7 +341,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Listériose",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -327,7 +354,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Peste",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas suspect
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -339,7 +367,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Rage",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -351,7 +380,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Rickettsioses",
-    seuilDefaut: 5,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -363,7 +393,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Rougeole",
-    seuilDefaut: 5,
+    seuilDefaut: 1,        // PDF : 1 cas hospitalisé ou 2 cas liés
+    periodeDefautJours: 1,
     categorieGravite: "grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -375,7 +406,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Rubéole",
-    seuilDefaut: 5,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas
+    periodeDefautJours: 1,
     categorieGravite: "moderee",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -387,7 +419,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Bilharziose",
-    seuilDefaut: 5,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "moderee",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -399,7 +432,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Tétanos néo.",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -411,7 +445,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Tétanos",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -423,7 +458,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "TIAC",
-    seuilDefaut: 2,
+    seuilDefaut: 2,        // PDF : ≥ 2 cas
+    periodeDefautJours: 1,
     categorieGravite: "grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -436,7 +472,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Trachome",
-    seuilDefaut: 10,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "faible",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -448,7 +485,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Typhus",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -456,6 +494,7 @@ export const MALADIES_SEED = [
   },
 
   // ─── Déclaration hebdomadaire (7 jours = 168h) ────────────────────────────
+  // Période de détection : 7 jours
 
   {
     nom: "Hépatite virale B",
@@ -463,7 +502,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "hebdomadaire",
     nomCourt: "Hépatite B",
-    seuilDefaut: 10,
+    seuilDefaut: 3,        // PDF : ≥ 3 cas
+    periodeDefautJours: 7,
     categorieGravite: "moderee",
     delaiNotificationHeures: 168,
     delaiDeclarationTexte: "Déclaration hebdomadaire (7 jours)",
@@ -475,7 +515,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "hebdomadaire",
     nomCourt: "Hépatite C",
-    seuilDefaut: 10,
+    seuilDefaut: 3,        // PDF : ≥ 3 cas
+    periodeDefautJours: 7,
     categorieGravite: "moderee",
     delaiNotificationHeures: 168,
     delaiDeclarationTexte: "Déclaration hebdomadaire (7 jours)",
@@ -487,7 +528,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "hebdomadaire",
     nomCourt: "Chlamydia",
-    seuilDefaut: 10,
+    seuilDefaut: 3,        // PDF : ≥ 3 cas
+    periodeDefautJours: 7,
     categorieGravite: "faible",
     delaiNotificationHeures: 168,
     delaiDeclarationTexte: "Déclaration hebdomadaire (7 jours)",
@@ -499,7 +541,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "hebdomadaire",
     nomCourt: "VIH/SIDA",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas confirmé
+    periodeDefautJours: 7,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 168,
     delaiDeclarationTexte: "Déclaration hebdomadaire (7 jours)",
@@ -511,7 +554,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "hebdomadaire",
     nomCourt: "Syphilis",
-    seuilDefaut: 5,
+    seuilDefaut: 3,        // PDF : ≥ 3 cas
+    periodeDefautJours: 7,
     categorieGravite: "moderee",
     delaiNotificationHeures: 168,
     delaiDeclarationTexte: "Déclaration hebdomadaire (7 jours)",
@@ -523,7 +567,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "hebdomadaire",
     nomCourt: "Gonococcie",
-    seuilDefaut: 10,
+    seuilDefaut: 3,        // PDF : ≥ 3 cas
+    periodeDefautJours: 7,
     categorieGravite: "faible",
     delaiNotificationHeures: 168,
     delaiDeclarationTexte: "Déclaration hebdomadaire (7 jours)",
@@ -531,6 +576,7 @@ export const MALADIES_SEED = [
   },
 
   // ─── Déclaration mensuelle (30 jours = 720h) ──────────────────────────────
+  // Période de détection : 30 jours
 
   {
     nom: "Tuberculose pulmonaire",
@@ -538,7 +584,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "mensuelle",
     nomCourt: "TB pulmonaire",
-    seuilDefaut: 10,
+    seuilDefaut: 5,        // PDF : augmentation inhabituelle (valeur de référence : 5)
+    periodeDefautJours: 30,
     categorieGravite: "grave",
     delaiNotificationHeures: 720,
     delaiDeclarationTexte: "Déclaration mensuelle (30 jours)",
@@ -550,7 +597,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_1_mdo",
     frequenceDeclaration: "mensuelle",
     nomCourt: "TB extra-pulm.",
-    seuilDefaut: 10,
+    seuilDefaut: 5,        // PDF : augmentation inhabituelle (valeur de référence : 5)
+    periodeDefautJours: 30,
     categorieGravite: "grave",
     delaiNotificationHeures: 720,
     delaiDeclarationTexte: "Déclaration mensuelle (30 jours)",
@@ -569,7 +617,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "urgence",
     nomCourt: "Poliomyélite",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 4,
     delaiDeclarationTexte: "Déclaration en urgence (< 4h) + appel téléphonique",
@@ -577,7 +626,7 @@ export const MALADIES_SEED = [
     ficheSpecifiqueSlug: "pfa",
   },
 
-  // ─── Déclaration quotidienne (24h) ────────────────────────────────────────
+  // ─── Déclaration quotidienne (24h) — potentiel épidémique international ───
 
   {
     nom: "Chikungunya",
@@ -585,7 +634,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Chikungunya",
-    seuilDefaut: 5,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "moderee",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -597,7 +647,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Choléra",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas suspect
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -609,7 +660,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Dengue",
-    seuilDefaut: 5,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -621,7 +673,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Ebola",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -633,7 +686,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Fièvre jaune",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -645,7 +699,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Fièvre du Rift",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -657,7 +712,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "West Nile",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -669,7 +725,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Fièvre hémorr.",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -681,7 +738,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Grippe nouveau",
-    seuilDefaut: 5,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -693,7 +751,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "SARS",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -705,7 +764,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "SARS-CoV-2",
-    seuilDefaut: 20,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -717,7 +777,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "MERS",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",
@@ -729,7 +790,8 @@ export const MALADIES_SEED = [
     categorie: "categorie_2_epidemique",
     frequenceDeclaration: "quotidienne",
     nomCourt: "Variole",
-    seuilDefaut: 1,
+    seuilDefaut: 1,        // PDF : 1 cas
+    periodeDefautJours: 1,
     categorieGravite: "tres_grave",
     delaiNotificationHeures: 24,
     delaiDeclarationTexte: "Déclaration quotidienne (24h)",

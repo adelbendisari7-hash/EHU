@@ -100,7 +100,7 @@ export default function DiseaseDistribution({ data, total }: { data: DiseaseData
             formatter={(value) => {
               const v = typeof value === "number" ? value : 0
               const pct = computedTotal > 0 ? Math.round((v / computedTotal) * 100) : 0
-              return `${pct}%`
+              return `${v} (${pct}%)`
             }}
             style={{ fontSize: 11, fill: "#6B7280", fontWeight: 600 }}
           />

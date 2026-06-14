@@ -2,6 +2,13 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { auth } from "@/lib/auth"
 
+function isFilled(v: unknown): boolean {
+  if (v === null || v === undefined) return false
+  if (typeof v === "string") { const s = v.trim(); return s !== "" && s !== "—" && s !== "-" }
+  if (v instanceof Date) return v.getFullYear() !== 2000
+  return true
+}
+
 export async function GET(req: Request) {
   const session = await auth()
   if (!session) return NextResponse.json({ error: "Non autorisé" }, { status: 401 })
@@ -30,7 +37,7 @@ export async function GET(req: Request) {
       }
     : { gte: since }
 
-  const where: Record<string, unknown> = { createdAt: dateFilter, statut: { not: "brouillon" } }
+  const where: Record<string, unknown> = { createdAt: { ...dateFilter }, statut: { not: "brouillon" } }
   if (maladieIds.length === 1) where.maladieId = maladieIds[0]
   else if (maladieIds.length > 1) where.maladieId = { in: maladieIds }
   if (communeIds.length === 1) where.communeId = communeIds[0]
@@ -41,12 +48,15 @@ export async function GET(req: Request) {
   if (services.length === 1) where.serviceDeclarant = services[0]
   else if (services.length > 1) where.serviceDeclarant = { in: services }
 
+  // whereTotal = where (createdAt toujours renseigné, pas besoin de OR)
+  const whereTotal = where
+
   // ── Previous period (same length, shifted back) for evolution KPI ──────────
   const periodMs = bucketEnd.getTime() - bucketStart.getTime()
   const prevEnd = new Date(bucketStart.getTime() - 1)
   const prevStart = new Date(prevEnd.getTime() - periodMs)
   const prevDateFilter = { gte: prevStart, lte: prevEnd }
-  const prevWhere: Record<string, unknown> = { createdAt: prevDateFilter, statut: { not: "brouillon" } }
+  const prevWhere: Record<string, unknown> = { createdAt: { ...prevDateFilter }, statut: { not: "brouillon" } }
   if (maladieIds.length === 1) prevWhere.maladieId = maladieIds[0]
   else if (maladieIds.length > 1) prevWhere.maladieId = { in: maladieIds }
   if (communeIds.length === 1) prevWhere.communeId = communeIds[0]
@@ -58,32 +68,46 @@ export async function GET(req: Request) {
   // ── KPI queries ─────────────────────────────────────────────────────────────
   const [
     nombreCas,
-    casComplets,
+    casForCompleteness,
     casConfirmes,
     casSuspects,
     casPrevPeriode,
   ] = await Promise.all([
-    // Total cas dans la période filtrée (brouillons exclus via where de base)
-    prisma.casDeclare.count({ where }),
-    // Cas avec les champs obligatoires remplis
-    prisma.casDeclare.count({
-      where: {
-        ...where,
-        maladieId: { not: null },
-        communeId: { not: null },
-        dateDiagnostic: { not: null },
-        dateDebutSymptomes: { not: null },
+    prisma.casDeclare.count({ where: whereTotal }),
+    prisma.casDeclare.findMany({
+      where,
+      select: {
+        dateDiagnostic: true, dateDebutSymptomes: true,
+        serviceDeclarant: true, service: true,
+        etablissementId: true, medecinDeclarantId: true,
+        observation: true, symptomesTexte: true, evolution: true,
+        maladieId: true, communeId: true,
+        patient: { select: { firstName: true, lastName: true, dateOfBirth: true, sex: true, address: true, commune: { select: { nom: true } } } },
+        maladie: { select: { nom: true } },
+        commune: { select: { nom: true } },
+        symptomes: { select: { id: true } },
       },
     }),
-    // Cas confirmés
-    prisma.casDeclare.count({ where: { ...where, statut: "confirme" } }),
-    // Cas suspects
-    prisma.casDeclare.count({ where: { ...where, statut: "suspect" } }),
-    // Période précédente
+    prisma.casDeclare.count({ where: { ...whereTotal, statut: "confirme" } }),
+    prisma.casDeclare.count({ where: { ...whereTotal, statut: "suspect" } }),
     prisma.casDeclare.count({ where: prevWhere }),
   ])
 
-  const tauxCompletude = nombreCas > 0 ? Math.round((casComplets / nombreCas) * 100) : 0
+  let totalScore = 0
+  for (const c of casForCompleteness) {
+    const fields: unknown[] = [
+      c.patient.firstName, c.patient.lastName, c.patient.dateOfBirth, c.patient.sex,
+      c.patient.address, c.patient.commune?.nom,
+      c.maladie?.nom, c.commune?.nom, c.dateDebutSymptomes, c.dateDiagnostic,
+      c.serviceDeclarant ?? c.service,
+      c.etablissementId, c.medecinDeclarantId,
+      c.observation, c.symptomesTexte ?? (c.symptomes.length > 0 ? "ok" : null), c.evolution,
+    ]
+    totalScore += fields.filter(isFilled).length / 16
+  }
+  const tauxCompletude = casForCompleteness.length > 0
+    ? Math.round((totalScore / casForCompleteness.length) * 100)
+    : 0
   const evolutionPct = casPrevPeriode > 0
     ? Math.round(((nombreCas - casPrevPeriode) / casPrevPeriode) * 100)
     : nombreCas > 0 ? 100 : 0
@@ -91,7 +115,7 @@ export async function GET(req: Request) {
   // ── Hotspot (smart wilaya/commune) ──────────────────────────────────────────
   const topCasByCommune = await prisma.casDeclare.groupBy({
     by: ["communeId"],
-    where,
+    where: whereTotal,
     _count: { id: true },
     orderBy: { _count: { id: "desc" } },
     take: 50,
@@ -146,7 +170,7 @@ export async function GET(req: Request) {
   // ── Wilaya case counts (for choropleth) ─────────────────────────────────────
   const casByCommune = await prisma.casDeclare.groupBy({
     by: ["communeId"],
-    where,
+    where: whereTotal,
     _count: { id: true },
   })
   const communeIds2 = casByCommune.map(c => c.communeId).filter((id): id is string => Boolean(id))
@@ -180,7 +204,7 @@ export async function GET(req: Request) {
   // ── Map markers ─────────────────────────────────────────────────────────────
   const casGeolocated = await prisma.casDeclare.findMany({
     where: {
-      ...where,
+      ...whereTotal,
       commune: {
         ...(wilayadIds.length > 0 ? { wilayadId: { in: wilayadIds } } : {}),
         latitude: { not: null },

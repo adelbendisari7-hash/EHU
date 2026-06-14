@@ -1,6 +1,8 @@
 "use client"
-import { UseFormRegister, UseFormWatch, FieldErrors, useFieldArray, Control } from "react-hook-form"
+import { UseFormRegister, UseFormWatch, UseFormSetValue, FieldErrors, useFieldArray, Control } from "react-hook-form"
 import { Plus, Trash2 } from "lucide-react"
+import DateInput from "@/components/shared/date-input"
+import { useFicheInit } from "@/hooks/use-fiche-init"
 
 interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -8,12 +10,17 @@ interface Props {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   watch: UseFormWatch<any>
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  setValue?: UseFormSetValue<any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   errors: FieldErrors
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   control?: Control<any>
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  initialData?: Record<string, any> | null
 }
 
-export default function FicheMeningite({ register, watch, errors, control }: Props) {
+export default function FicheMeningite({ register, watch, setValue, errors, control, initialData }: Props) {
+  useFicheInit(initialData, setValue)
   const collectivite = watch("fiche.collectivite")
   const contactMeningite = watch("fiche.contactMeningite")
   const vaccineAntiMeningocoque = watch("fiche.vaccineAntiMeningocoque")
@@ -149,7 +156,7 @@ export default function FicheMeningite({ register, watch, errors, control }: Pro
           {vaccineAntiMeningocoque && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Date de vaccination</label>
-              <input type="date" {...register("fiche.dateVaccin")} className="input w-full max-w-xs" />
+              <DateInput name="fiche.dateVaccin" watch={watch} setValue={setValue!} className="input w-full max-w-xs" />
             </div>
           )}
         </div>
