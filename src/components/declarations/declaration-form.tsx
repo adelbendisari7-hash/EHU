@@ -993,7 +993,8 @@ export default function DeclarationForm({ casId, copyId }: { casId?: string; cop
     ficheSpecifiqueType: ficheSpecifiqueSlug || null,
     // getValues("fiche") lit directement dans le store RHF, sans passer par zodResolver
     // qui supprime les champs non déclarés dans le schéma Zod.
-    donneesSpecifiques: ficheSpecifiqueSlug ? (getValues("fiche") ?? null) : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    donneesSpecifiques: ficheSpecifiqueSlug ? ((getValues as any)("fiche") ?? null) : null,
     nationaliteCode: data.nationaliteCode || null,
     structureHospitalisationId: data.structureHospitalisationId || null,
     serviceHospitalisation: data.serviceHospitalisation || null,

@@ -66,7 +66,7 @@ export default function DiseaseCombobox({ grouped, value, onChange, error }: Dis
     const q = search.toLowerCase()
     const filter = (list: Maladie[]) =>
       list.filter((m) => m.nom.toLowerCase().includes(q) || m.codeCim10.toLowerCase().includes(q))
-    return Object.fromEntries(GROUPES_ORDER.map(g => [g, filter(grouped[g] ?? [])])) as GroupedMaladies
+    return Object.fromEntries(GROUPES_ORDER.map(g => [g, filter(grouped[g] ?? [])])) as unknown as GroupedMaladies
   }, [search, grouped])
 
   useEffect(() => {
