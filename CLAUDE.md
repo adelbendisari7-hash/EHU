@@ -23,6 +23,7 @@ npx vitest run __tests__/utils/format-date.test.ts  # Run a single test file
 # Database
 npm run db:migrate    # Apply pending Prisma migrations (production)
 npm run db:seed       # Seed reference data (48 wilayas, 1541 communes, all MDO diseases)
+npm run db:seed:uisti # Seed UISTI-specific reference data
 npx prisma migrate dev --name <name>  # Create a new migration (development)
 npx prisma generate   # Regenerate Prisma Client after schema changes
 npx prisma studio     # Open Prisma Studio GUI
@@ -65,6 +66,10 @@ Business logic lives **directly in API route handlers** — there is no separate
   - `parametres/` — System settings: diseases, thresholds, protocols, users, establishments
   - `utilisateurs/` — User management (admin only)
   - `roles/` — RBAC role/permission management (admin only)
+  - `dashboard/` — Main summary dashboard (stats cards, recent cases, active alerts)
+  - `mes-stats/` — Per-user personal statistics
+  - `notifications/` — Notification center
+  - `profil/` — User profile and password change
 - `src/app/api/` — REST API handlers; collection at `[resource]/route.ts`, single item at `[resource]/[id]/route.ts`
 - `middleware.ts` — Intercepts all requests; allows only `/login`, `/forgot-password`, `/reset-password` unauthenticated; uses `authjs.session-token` cookie (or `__Secure-` prefix on HTTPS)
 
@@ -96,8 +101,10 @@ Every route handler must follow this pattern:
 | `src/lib/check-thresholds.ts` | Called after each case save; compares case counts against `SeuilAlerte` rules and auto-creates `Alerte` records + `Notification` rows |
 | `src/lib/predictions.ts` | Pure algorithmic functions: `computeCusum()` (CUSUM anomaly detection) and `computeHoltWinters()` (Holt linear trend + 14-day forecast) — no DB access, tested in isolation |
 | `src/lib/storage.ts` | Local-filesystem file storage to `public/uploads/`; exports `saveUploadedFile(file)` and `deleteUploadedFile(url)`. S3 env vars are optional future replacement |
-| `src/hooks/` | Client-side custom hooks; data fetching uses SWR or React Query — never call `fetch` directly in components |
+| `src/hooks/use-auth.ts` | Reads the current NextAuth session client-side |
 | `src/hooks/use-fiche-init.ts` | Auto-fills disease-specific form fields (fiche spécifique) on mount via `setValue`; handles nested objects recursively |
+| `src/hooks/use-ocr-scan.ts` | Uploads a scanned form image to the OCR microservice; returns extracted field values with confidence scores |
+| `src/lib/email.ts` | Sends transactional emails via Resend; exports `sendAlertEmail()` |
 | `src/components/ui/` | shadcn/ui primitives (Radix UI) — do not edit manually |
 | `src/components/shared/` | Reusable cross-feature components |
 | `src/constants/` | App-wide enums and lookup tables (statuts, roles, reference data, navigation) |
@@ -135,6 +142,8 @@ Four diseases have extended forms beyond the standard declaration: diphtérie, m
 - No barrel files (`index.ts`) in `components/` — import each component directly
 - Maps (Leaflet via `react-leaflet`) must be wrapped in `dynamic(..., { ssr: false })`
 - Charts use Recharts (client-only)
+- Toasts use `sonner`; animations use `framer-motion`
+- Excel export uses `xlsx`; PDF export uses `jspdf` + `jspdf-autotable`; PDF capture uses `html2canvas`
 - Path alias `@/` maps to `src/` — use it for all imports
 - CSS design system in `src/app/globals.css` (CSS variables); primary brand color `#1B4F8A`
 - Tailwind v4 with PostCSS plugin (`@tailwindcss/postcss`) — no `tailwind.config.js`

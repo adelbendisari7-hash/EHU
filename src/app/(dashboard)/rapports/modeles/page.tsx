@@ -221,130 +221,128 @@ export default function RapportModelesPage() {
       {showModal && (
         <>
           <div className="fixed inset-0 z-40 bg-black/50" onClick={() => setShowModal(false)} />
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-start justify-center px-4 py-10">
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-base font-semibold text-gray-800">{editTemplate ? "Modifier le modèle" : "Nouveau modèle"}</h2>
-              <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
-                <X size={16} className="text-gray-400" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Titre du modèle *</label>
-                <input
-                  value={form.titre}
-                  onChange={e => setForm(p => ({ ...p, titre: e.target.value }))}
-                  placeholder="Ex: Rapport mensuel MDO"
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100"
-                />
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6">
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg flex flex-col max-h-[90vh]">
+              <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
+                <h2 className="text-base font-semibold text-gray-800">{editTemplate ? "Modifier le modèle" : "Nouveau modèle"}</h2>
+                <button onClick={() => setShowModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                  <X size={16} className="text-gray-400" />
+                </button>
               </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Type de rapport</label>
-                <select
-                  value={form.type}
-                  onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100"
-                >
-                  {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                </select>
-              </div>
+              <div className="overflow-y-auto flex-1 px-6 space-y-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Titre du modèle *</label>
+                  <input
+                    value={form.titre}
+                    onChange={e => setForm(p => ({ ...p, titre: e.target.value }))}
+                    placeholder="Ex: Rapport mensuel MDO"
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Description (optionnel)</label>
-                <textarea
-                  value={form.description}
-                  onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
-                  rows={2}
-                  placeholder="Décrivez l'usage de ce modèle..."
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Type de rapport</label>
+                  <select
+                    value={form.type}
+                    onChange={e => setForm(p => ({ ...p, type: e.target.value }))}
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100"
+                  >
+                    {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-2">Sections à inclure</label>
-                <div className="space-y-1.5">
-                  {SECTION_OPTIONS.map(s => (
-                    <label key={s} className="flex items-center gap-2.5 cursor-pointer group">
-                      <div
-                        onClick={() => toggleSection(s)}
-                        className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
-                          form.sections.includes(s)
-                            ? "border-blue-600"
-                            : "border-gray-300 group-hover:border-gray-400"
-                        }`}
-                        style={form.sections.includes(s) ? { backgroundColor: "#1B4F8A", borderColor: "#1B4F8A" } : {}}
-                      >
-                        {form.sections.includes(s) && <Check size={10} className="text-white" />}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Description (optionnel)</label>
+                  <textarea
+                    value={form.description}
+                    onChange={e => setForm(p => ({ ...p, description: e.target.value }))}
+                    rows={2}
+                    placeholder="Décrivez l'usage de ce modèle..."
+                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-100 resize-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-2">Sections à inclure</label>
+                  <div className="space-y-1.5">
+                    {SECTION_OPTIONS.map(s => (
+                      <label key={s} className="flex items-center gap-2.5 cursor-pointer group">
+                        <div
+                          onClick={() => toggleSection(s)}
+                          className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
+                            form.sections.includes(s)
+                              ? "border-blue-600"
+                              : "border-gray-300 group-hover:border-gray-400"
+                          }`}
+                          style={form.sections.includes(s) ? { backgroundColor: "#1B4F8A", borderColor: "#1B4F8A" } : {}}
+                        >
+                          {form.sections.includes(s) && <Check size={10} className="text-white" />}
+                        </div>
+                        <span className="text-sm text-gray-700">{s}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pb-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="block text-xs font-medium text-gray-600">Visualisations à inclure</label>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setForm(p => ({
+                          ...p,
+                          visualisations: p.visualisations.length === VISUALISATION_OPTIONS.length
+                            ? []
+                            : VISUALISATION_OPTIONS.map(o => o.value),
+                        }))
+                      }
+                      className="text-xs text-[#1B4F8A] hover:underline"
+                    >
+                      {form.visualisations.length === VISUALISATION_OPTIONS.length ? "Tout désélectionner" : "Tout sélectionner"}
+                    </button>
+                  </div>
+                  {(["Tableau de bord", "Analyses"] as const).map(grp => (
+                    <div key={grp} className="mb-3">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">{grp}</p>
+                      <div className="space-y-1.5">
+                        {VISUALISATION_OPTIONS.filter(o => o.group === grp).map(opt => (
+                          <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer group">
+                            <div
+                              onClick={() => toggleVisualisation(opt.value)}
+                              className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
+                                form.visualisations.includes(opt.value)
+                                  ? "border-blue-600"
+                                  : "border-gray-300 group-hover:border-gray-400"
+                              }`}
+                              style={form.visualisations.includes(opt.value) ? { backgroundColor: "#1B4F8A", borderColor: "#1B4F8A" } : {}}
+                            >
+                              {form.visualisations.includes(opt.value) && <Check size={10} className="text-white" />}
+                            </div>
+                            <span className="text-sm text-gray-700">{opt.label}</span>
+                          </label>
+                        ))}
                       </div>
-                      <span className="text-sm text-gray-700">{s}</span>
-                    </label>
+                    </div>
                   ))}
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="block text-xs font-medium text-gray-600">Visualisations à inclure</label>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm(p => ({
-                        ...p,
-                        visualisations: p.visualisations.length === VISUALISATION_OPTIONS.length
-                          ? []
-                          : VISUALISATION_OPTIONS.map(o => o.value),
-                      }))
-                    }
-                    className="text-xs text-[#1B4F8A] hover:underline"
-                  >
-                    {form.visualisations.length === VISUALISATION_OPTIONS.length ? "Tout désélectionner" : "Tout sélectionner"}
-                  </button>
-                </div>
-                {(["Tableau de bord", "Analyses"] as const).map(grp => (
-                  <div key={grp} className="mb-3">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-1.5">{grp}</p>
-                    <div className="space-y-1.5">
-                      {VISUALISATION_OPTIONS.filter(o => o.group === grp).map(opt => (
-                        <label key={opt.value} className="flex items-center gap-2.5 cursor-pointer group">
-                          <div
-                            onClick={() => toggleVisualisation(opt.value)}
-                            className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
-                              form.visualisations.includes(opt.value)
-                                ? "border-blue-600"
-                                : "border-gray-300 group-hover:border-gray-400"
-                            }`}
-                            style={form.visualisations.includes(opt.value) ? { backgroundColor: "#1B4F8A", borderColor: "#1B4F8A" } : {}}
-                          >
-                            {form.visualisations.includes(opt.value) && <Check size={10} className="text-white" />}
-                          </div>
-                          <span className="text-sm text-gray-700">{opt.label}</span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+              <div className="flex justify-end gap-2 px-6 py-4 border-t border-gray-100 shrink-0">
+                <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+                  Annuler
+                </button>
+                <button
+                  onClick={submitForm}
+                  disabled={submitting}
+                  className="px-4 py-2 text-sm text-white rounded-lg font-medium disabled:opacity-60 transition-colors"
+                  style={{ backgroundColor: "#1B4F8A" }}
+                >
+                  {submitting ? "Enregistrement..." : editTemplate ? "Mettre à jour" : "Créer le modèle"}
+                </button>
               </div>
             </div>
-
-            <div className="flex justify-end gap-2 mt-6">
-              <button onClick={() => setShowModal(false)} className="px-4 py-2 text-sm text-gray-600 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
-                Annuler
-              </button>
-              <button
-                onClick={submitForm}
-                disabled={submitting}
-                className="px-4 py-2 text-sm text-white rounded-lg font-medium disabled:opacity-60 transition-colors"
-                style={{ backgroundColor: "#1B4F8A" }}
-              >
-                {submitting ? "Enregistrement..." : editTemplate ? "Mettre à jour" : "Créer le modèle"}
-              </button>
-            </div>
-          </div>
-          </div>
           </div>
         </>
       )}
